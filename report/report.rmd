@@ -1,0 +1,349 @@
+---
+title: Pipeline Report
+output: 
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+params:
+  report: "report"
+  dat: "dat"
+  name: "filename"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+```
+
+# Table of Contents
+```{r  fig.width = 6, echo = F, results = "asis"}
+cat("1. Main Page")
+i = 1
+for (p in unique(params$report$results$id.exposure)) {
+  i = i + 1
+  cat("  \n", i, ". [", p, " Results](./traits/", p, ".html)  \n", sep = "")
+  # Double space in front of \n is special? Undocumented feature??
+  cat("  \n")
+}
+```
+
+# Report Details
+
+This page contains meta-data regarding the analyses that have been carried out and links to the per-trait specific analyses. Navigation is achieved through the table of contents. All tables and figures are downloadable and all separate report pages are self-contained html files, meaning these can be sent to other people without extra files.
+
+Details and explanations of analyses and results are given throughout.
+
+# Overview of Results
+
+Tables presented here present a breakdown and overview of the datasets and results.
+
+## Cleaning {.tabset}
+
+### Exposure datasets
+
+There were `r nrow(unique(params$report$exposures))` exposure datasets provided. Details are provided in the following table for each dataset, including how many SNPs were removed at each stage of the QC pipeline.
+
+<button class="btn btn-primary" data-toggle="collapse" data-target="#BlockName"> Show/Hide </button>  
+<div id="BlockName" class="collapse">  
+```{r exposures}
+dat <- params$report$exposures
+
+dat$Trait.Name <- paste0("<a href='./traits/", dat$Trait.ID, ".html'>", dat$Trait.Name, "</a>")
+dat$Trait.ID <- paste0("<a href='https://gwas.mrcieu.ac.uk/datasets/", dat$Trait.ID, "/'>", dat$Trait.ID, "</a>")
+
+DT::datatable(dat, rownames = F,
+              escape = F,
+              caption = "Breakdown for each exposure dataset.",
+              extensions = c("Buttons"),
+              options = list(order = list(7, "asc"), dom = "Dfrtip", buttons = c("copy", "csv")))
+```
+**Column headers and meanings**
+<ul>
+  <li><code>Trait.Name</code>: Name of the trait.</li>
+  <li><code>SNPs</code>: Number of SNPs initially loaded from the GWAS (either from the file or from the OpenGWAS database).</li>
+  <li><code>Preclumped</code>: Whether or not the dataset was already clumped (e.g., data from OpenGWAS can be retrieved after undergoing clumping with the standard parameters).</li>
+  <li><code>Rem.F.Stat</code>: Number of SNPs which were removed due to not meeting the F-statistic cut-off.</li>
+  <li><code>Rem.Clumped</code>: Number of SNPs which were removed due to clumping. Note that this will be 0 if the data was pre-clumped.</li>
+  <li><code>SNPs.Formatted</code>: Number of SNPs which were successfully formatted to the MR-Base/TwoSampleMR package format (e.g., SNPs which had negative standard errors are removed at this stage).</li>
+</ul>
+
+**Exposure SNPs**
+
+This table details the final list of formatted SNPs for the exposure datasets which were used in the MR analyses.
+
+```{r exp_dat}
+params$dat[, colnames(params$dat) %in% c("SNP",
+                                        "effect_allele.exposure",
+                                        "other_allele.exposure",
+                                        "beta.exposure",
+                                        "eaf.exposure",
+                                        "chr",
+                                        "pos",
+                                        "se.exposure",
+                                        "pval.exposure",
+                                        "exposure",
+                                        "mr_keep.exposure",
+                                        "f.stat.exposure")] %>%
+  dplyr::rename(Eff.Allele = effect_allele.exposure,
+                Alt.Allele = other_allele.exposure,
+                Beta = beta.exposure,
+                EAF = eaf.exposure,
+                Chr = chr,
+                Pos = pos,
+                SE = se.exposure,
+                P.value = pval.exposure,
+                Exposure = exposure,
+                Inc.MR = mr_keep.exposure,
+                F.Stat = f.stat.exposure) %>%
+  DT::datatable(rownames = F,
+                caption = "Details for SNPs which were included in the MR analysis by passing the QC and cleaning stages.",
+                extensions = c("Buttons"),
+                options = list(order = list(7, "asc"), dom = "Dfrtip", buttons = c("copy", "csv"))) %>%
+  DT::formatSignif(columns = c("P.value"), digits = 3) %>%
+  DT::formatRound(columns = c("F.Stat"), digits = 0)
+```
+</div>
+
+### Outcome datasets
+
+There were `r nrow(unique(params$report$outcomes))` outcome datasets provided. Details are provided in the following table for each dataset, including details on how many SNPs were proxied.
+
+<button class="btn btn-primary" data-toggle="collapse" data-target="#BlockName2"> Show/Hide </button>  
+<div id="BlockName2" class="collapse">  
+```{r outcomes}
+knitr::kable(params$report$outcomes, caption = "QC breakdown for outcome datasets")
+```
+**Column headers and meanings**
+<ul>
+  <li><code>Trait.Name</code>: Name of the trait.</li>
+  <li><code>SNPs</code>: Number of SNPs initially loaded from the GWAS (either from the file or from the OpenGWAS database).</li>
+  <li><code>Num.Proxies</code>: Number of proxied SNPs. A list of all unique SNPs from all exposure datasets are used to extract outcome SNPs -- if a SNP is not found then a proxy SNP is used instead.</li>
+  <li><code>SNPs.Formatted</code>: Number of SNPs which were successfully formatted to the MR-Base/TwoSampleMR package format (e.g., SNPs which had negative standard errors are removed at this stage).</li>
+</ul>
+
+**Outcome SNPs**
+
+This table details the final list of formatted SNPs for the outcome datasets which were used in the MR analyses.
+
+```{r out_dat}
+params$dat[, colnames(params$dat) %in% c("SNP",
+                                        "effect_allele.outcome",
+                                        "other_allele.outcome",
+                                        "beta.outcome",
+                                        "eaf.outcome",
+                                        "chr",
+                                        "pos",
+                                        "se.outcome",
+                                        "pval.outcome",
+                                        "outcome",
+                                        "proxy.outcome",
+                                        "proxy_snp.outcome")] %>%
+  dplyr::rename(Eff.Allele = effect_allele.outcome,
+                Alt.Allele = other_allele.outcome,
+                Beta = beta.outcome,
+                EAF = eaf.outcome,
+                Chr = chr,
+                Pos = pos,
+                SE = se.outcome,
+                P.value = pval.outcome,
+                Outcome = outcome,
+                Proxy = proxy.outcome,
+                Proxy.SNP = proxy_snp.outcome) %>%
+  DT::datatable(rownames = F,
+                caption = "Details for outcome SNPs, or their proxies, which were included in the MR analysis.",
+                extensions = c("Buttons"),
+                options = list(order = list(7, "asc"), dom = "Dfrtip", buttons = c("copy", "csv"))) %>%
+  DT::formatSignif(columns = c("P.value"), digits = 3)
+```
+
+</div>
+
+
+## MR Results {.tabset}
+
+MR methods are split into \"main\", which include the Wald ratio (WR) and inverse variance weighted (IVW) methods, and \"sensitivity\", which include all others, e.g. MR-Egger. In this section, a subset of the \"main\" results are shown; all results from the MR analyses are given in their respective trait-only results pages. 
+
+As there were a total of `r 0.05 / params$report$bonferroni` MR tests conducted, a Bonferroni P-value threshold of `r params$report$bonferroni` ($0.05 / tests$) may be used for \"significance\".
+
+### MR P < `r params$report$bonferroni`
+<button class="btn btn-primary" data-toggle="collapse" data-target="#p1"> Show/Hide </button>  
+<div id="p1" class="collapse">  
+```{r mr_p1}
+dat <- params$report$results
+if (nrow(dat[dat$pval < params$report$bonferroni, ])) {
+  dplyr::rename(dat[dat$pval < params$report$bonferroni, ],
+              Exposure.ID = id.exposure,
+              Outcome.ID = id.outcome,
+              Outcome = outcome,
+              Exposure = exposure,
+              Method = method,
+              SNPs = nsnp,
+              P.value = pval,
+              OR = or,
+              Lower.95ci = or_lci95,
+              Upper.95ci = or_uci95) %>%
+  dplyr::relocate(Outcome, .after = Exposure) %>%
+  DT::datatable(rownames = F,
+                extensions = c("Buttons"),
+                options = list(order = list(7, "asc"), dom = "Dfrtip", buttons = c("copy", "csv"))) %>%
+  DT::formatSignif(columns = c("P.value", "OR", "Lower.95ci", "Upper.95ci"), digits = 3)
+  #knitr::kable(dat[dat$pval < params$report$bonferroni, ], caption = paste0("MR results where P < ", params$report$bonferroni))
+} else {
+  cat("There were no results which met the Bonferroni P-value threshold.")
+}
+```
+**Column headers and meanings**
+<ul>
+  <li><code>Exposure.ID</code>: OpenGWAS ID or filename for Exposures.</li>
+  <li><code>Outcome.ID</code>: OpenGWAS ID or filename for Outcomes.</li>
+  <li><code>Exposure</code>: Exposure trait names.</li>
+  <li><code>Outcome</code>: Outcome trait names</li>
+  <li><code>Method</code>: MR method, either WR for single-SNP instruments or IVW for multi-SNP instruments.</li>
+  <li><code>SNPs</code>: Number of SNPs that form the instrument.</li>
+  <li><code>P.value</code>: MR P value.</li>
+  <li><code>OR</code>: MR odds ratios.</li>
+  <li><code>Lower.95ci</code>: Lower 95% confidence interval.</li>
+  <li><code>Upper.95ci</code>: Upper 95% confidence interval.</li>
+</ul>
+</div>
+
+### MR P < 0.05
+<button class="btn btn-primary" data-toggle="collapse" data-target="#p2"> Show/Hide </button>  
+<div id="p2" class="collapse">  
+```{r mr_p2}
+dat <- params$report$results
+if (nrow(dat[dat$pval < 0.05, ])) {
+  dplyr::rename(dat[dat$pval < 0.05, ],
+              Exposure.ID = id.exposure,
+              Outcome.ID = id.outcome,
+              Outcome = outcome,
+              Exposure = exposure,
+              Method = method,
+              SNPs = nsnp,
+              P.value = pval,
+              OR = or,
+              Lower.95ci = or_lci95,
+              Upper.95ci = or_uci95) %>%
+  dplyr::relocate(Outcome, .after = Exposure) %>%
+  DT::datatable(rownames = F,
+                extensions = c("Buttons"),
+                options = list(order = list(7, "asc"), dom = "Bfrtip", buttons = c("copy", "csv"))) %>%
+  DT::formatSignif(columns = c("P.value", "OR", "Lower.95ci", "Upper.95ci"), digits = 3)
+  #knitr::kable(dat[dat$pval < 0.05 ], caption = paste0("MR results where P < 0.05"))
+} else {
+  cat("There were no results which met the 0.05 P-value threshold.")
+}
+```
+**Column headers and meanings**
+<ul>
+  <li><code>Exposure.ID</code>: OpenGWAS ID or filename for Exposures.</li>
+  <li><code>Outcome.ID</code>: OpenGWAS ID or filename for Outcomes.</li>
+  <li><code>Exposure</code>: Exposure trait names.</li>
+  <li><code>Outcome</code>: Outcome trait names</li>
+  <li><code>Method</code>: MR method, either WR for single-SNP instruments or IVW for multi-SNP instruments.</li>
+  <li><code>SNPs</code>: Number of SNPs that form the instrument.</li>
+  <li><code>P.value</code>: MR P value.</li>
+  <li><code>OR</code>: MR odds ratios.</li>
+  <li><code>Lower.95ci</code>: Lower 95% confidence interval.</li>
+  <li><code>Upper.95ci</code>: Upper 95% confidence interval.</li>
+</ul>
+</div>
+
+### All MR
+<button class="btn btn-primary" data-toggle="collapse" data-target="#p3"> Show/Hide </button>  
+<div id="p3" class="collapse">  
+```{r mr_p3}
+dat <- params$report$results
+dplyr::rename(dat,
+            Exposure.ID = id.exposure,
+            Outcome.ID = id.outcome,
+            Outcome = outcome,
+            Exposure = exposure,
+            Method = method,
+            SNPs = nsnp,
+            P.value = pval,
+            OR = or,
+            Lower.95ci = or_lci95,
+            Upper.95ci = or_uci95) %>%
+dplyr::relocate(Outcome, .after = Exposure) %>%
+DT::datatable(rownames = F,
+              extensions = c("Buttons"),
+              options = list(order = list(7, "asc"), dom = "Bfrtip", buttons = c("copy", "csv"))) %>%
+DT::formatSignif(columns = c("P.value", "OR", "Lower.95ci", "Upper.95ci"), digits = 3)
+```
+**Column headers and meanings**
+<ul>
+  <li><code>Exposure.ID</code>: OpenGWAS ID or filename for Exposures.</li>
+  <li><code>Outcome.ID</code>: OpenGWAS ID or filename for Outcomes.</li>
+  <li><code>Exposure</code>: Exposure trait names.</li>
+  <li><code>Outcome</code>: Outcome trait names</li>
+  <li><code>Method</code>: MR method, either WR for single-SNP instruments or IVW for multi-SNP instruments.</li>
+  <li><code>SNPs</code>: Number of SNPs that form the instrument.</li>
+  <li><code>P.value</code>: MR P value.</li>
+  <li><code>OR</code>: MR odds ratios.</li>
+  <li><code>Lower.95ci</code>: Lower 95% confidence interval.</li>
+  <li><code>Upper.95ci</code>: Upper 95% confidence interval.</li>
+</ul>
+</div>
+
+## Colocalisation Results {.tabset}
+
+Here is a brief overview of the colocalisation results.
+
+### H4 >= 80%
+<button class="btn btn-primary" data-toggle="collapse" data-target="#c1"> Show/Hide </button>  
+<div id="c1" class="collapse">  
+```{r coloc_table1}
+cresults <- params$report$cresults
+if (length(cresults[cresults$H4 > 0.8, ])) {
+  dplyr::rename(cresults[cresults$H4 > 0.8, ],
+                Exposure.ID = id1,
+                Outcome.ID = id2,
+                SNPs = nsnps,
+                ChrPos = chrpos) %>%
+    DT::datatable(rownames = F,
+                  extensions = c("Buttons"),
+                  options = list(dom = "Bfrtip", buttons = c("copy", "csv"))) %>%
+    DT::formatPercentage(c("H0", "H1", "H2", "H3", "H4"), 2)
+} else {
+  cat("There were no results which met the 80% threshold.")
+}
+```
+**Column headers and meanings**
+<ul>
+  <li><code>Exposure.ID</code>: OpenGWAS ID or filename for Exposures.</li>
+  <li><code>Outcome.ID</code>: OpenGWAS ID or filename for Outcomes.</li>
+  <li><code>SNPs</code>: Number of SNPs that form the instrument.</li>
+  <li><code>H0-4</code>: Posterior probability for hypotheses 1 through 4.</li>
+  <li><code>ChrPos</code>: Chromosome and position range used to extract SNPs for colocalisation.</li>
+</ul>
+</div>
+
+### All Results
+<button class="btn btn-primary" data-toggle="collapse" data-target="#c2"> Show/Hide </button>  
+<div id="c2" class="collapse">  
+```{r coloc_table2}
+cresults <- params$report$cresults
+if (length(cresults)) {
+  dplyr::rename(cresults,
+                Exposure.ID = id1,
+                Outcome.ID = id2,
+                SNPs = nsnps,
+                ChrPos = chrpos) %>%
+    DT::datatable(rownames = F,
+                  extensions = c("Buttons"),
+                  options = list(dom = "Bfrtip", buttons = c("copy", "csv"))) %>%
+    DT::formatPercentage(c("H0", "H1", "H2", "H3", "H4"), 2)
+} else {
+  cat("There are no colocalisation results.")
+}
+```
+**Column headers and meanings**
+<ul>
+  <li><code>Exposure.ID</code>: OpenGWAS ID or filename for Exposures.</li>
+  <li><code>Outcome.ID</code>: OpenGWAS ID or filename for Outcomes.</li>
+  <li><code>SNPs</code>: Number of SNPs that form the instrument.</li>
+  <li><code>H0-4</code>: Posterior probability for hypotheses 1 through 4.</li>
+  <li><code>ChrPos</code>: Chromosome and position range used to extract SNPs for colocalisation.</li>
+</ul>
+</div>
