@@ -13,16 +13,18 @@
 #   Check Package:             'Ctrl + Shift + E'
 #   Test Package:              'Ctrl + Shift + T'
 
-mr_pipeline <- function(id1, id2,
-                         p_cutoff = 5e-8,
-                         f_cutoff = 10,
-                         chrompos_query = NULL,
-                         gene_query = NULL,
-                         markdown = T,
-                         out_path = "",
-                         out_name = "",
-                         nthreads = 1,
-                         ...)
+mr_pipeline <- function(ids1, ids2,
+                        p_cutoff = 5e-8,
+                        f_cutoff = 10,
+                        chrompos_query = NULL,
+                        gene_query = NULL,
+                        markdown = T,
+                        out_path = "",
+                        out_name = "",
+                        nthreads = 1,
+                        bfile = NULL,
+                        plink_bin = NULL,
+                        ...)
 {
   if (is.null(p_cutoff) && is.null(chrompos_query) && is.null(gene_query))
   {
@@ -36,17 +38,32 @@ mr_pipeline <- function(id1, id2,
   report$initialise()
 
   # Parsing ids/filename given
-  id1 <- load_ids(id1)
-  id2 <- load_ids(id2)
+  id1 <- DatasetIDs$new()
+  id1$initFields()
+  id1$initialise(ids1)
+
+  id2 <- DatasetIDs$new()
+  id2$initFields()
+  id2$initialise(ids2)
 
   # Read datasets, format and harmonise in TwoSampleMR format
-  dat <- read_datasets(id1, id2, report, p_cutoff, chrompos_query, gene_query, f_cutoff = f_cutoff, nthreads = nthreads)
+  dat <- read_datasets(id1, id2,
+                       report,
+                       p_cutoff, chrompos_query, gene_query,
+                       f_cutoff = f_cutoff,
+                       bfile = bfile,
+                       plink_bin = plink_bin,
+                       nthreads = nthreads)
+
+  #id1 <- annotate_datasets(id1, dat, "exposure")
+  #id2 <- annotate_datasets(id2, dat, "outcome")
+  dat <- annotate_data(dat, id1, id2)
 
   # MR analyses
   res <- do_mr(dat, report)
 
   # Colocalisation
-  cres <- do_coloc(id1, id2, dat, report)
+  cres <- do_coloc(dat, id1, id2, report)
 
   # Where are we saving the reports?
   if (out_path == "")
@@ -69,14 +86,21 @@ mr_pipeline <- function(id1, id2,
   dir.create(file.path(out_path, out_name, "traits"))
 
   # Create each per-trait report first
-  for (id.exposure in id1$id)
+  for (id.exposure in id1$info$id)
   {
-    make_results(out_path, out_name, report, id.exposure)
+    trait.name <- id1$info[id1$info$id == id.exposure, ]$trait
+    make_results(out_path, out_name, report, dat[dat$id.exposure == id.exposure, ], id.exposure, trait.name)
+  }
+
+  for (id.outcome in id2$info$id)
+  {
+    trait.name <- id2$info[id2$info$id == id.outcome, ]$trait
+    make_outcomes(out_path, out_name, report, dat[dat$id.outcome == id.outcome, ], id.outcome, trait.name)
   }
 
   make_report(out_path, out_name, dat, report)
 
-  return(list(dat, res, cres, report))
+  return(list(dat, res, cres, report, id1, id2))
 }
 
 load_ids <- function(ids)
@@ -91,6 +115,22 @@ load_ids <- function(ids)
     dat[loc,]$trait <- tools::file_path_sans_ext(basename(dat[loc,]$filename))
     dat[loc,]$id <- tools::file_path_sans_ext(basename(dat[loc,]$filename))
   }
+  return(dat)
+}
+
+annotate_data <- function(dat, id1, id2)
+{
+  dat$ogdb_eid <- dat$id.exposure
+  dat$ogdb_oid <- dat$id.outcome
+
+  dat <- left_join(dat, id1$info, by=c("id.exposure"="id")) %>%
+    mutate(exposure = ifelse(is.na(trait), exposure, trait)) %>%
+    select(-filename, -trait)
+
+  dat <- left_join(dat, id2$info, by=c("id.outcome"="id")) %>%
+    mutate(outcome = ifelse(is.na(trait), outcome, trait)) %>%
+    select(-filename, -trait)
+
   return(dat)
 }
 

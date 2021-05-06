@@ -3,6 +3,8 @@ QCReport <- setRefClass("QCReport",
                                       outcomes = "data.frame",
                                       results = "data.frame",
                                       sresults = "data.frame",
+                                      hetresults = "data.frame",
+                                      pleioresults = "data.frame",
                                       cresults = "data.frame",
                                       bonferroni = "numeric",
                                       plots = "data.frame",
@@ -12,18 +14,22 @@ QCReport <- setRefClass("QCReport",
                           initialise = function() {
                             exposures <<- data.frame(Trait.Name = character(),
                                                     Trait.ID = character(),
+                                                    Trait.Annotated = character(),
                                                     SNPs = integer(),
                                                     Preclumped = logical(),
                                                     Rem.F.Stat = integer(),
                                                     Rem.Clumped = integer(),
                                                     SNPs.Formatted = integer(),
+                                                    From.IEUGWASDB = integer(),
                                                     stringsAsFactors = F
                             )
                             outcomes <<- data.frame(Trait.Name = character(),
                                                     Trait.ID = character(),
+                                                    Trait.Annotated = character(),
                                                     SNPs = integer(),
                                                     Num.Proxies = integer(),
                                                     SNPs.Formatted = integer(),
+                                                    From.IEUGWASDB = integer(),
                                                     stringsAsFactors = F
                             )
                             results <<- data.frame(id.exposure = character(),
@@ -38,8 +44,28 @@ QCReport <- setRefClass("QCReport",
                                                    or_uci95 = integer()
                             )
                             sresults <<- data.frame(results)
+                            hetresults <<- data.frame(id.exposure = character(),
+                                                      id.outcome = character(),
+                                                      outcome = character(),
+                                                      exposure = character(),
+                                                      method = character(),
+                                                      Q = character(),
+                                                      Q_df = character(),
+                                                      Q_pval = character()
+                            )
+                            pleioresults <<- data.frame(id.exposure = character(),
+                                                        id.outcome = character(),
+                                                        outcome = character(),
+                                                        exposure = character(),
+                                                        method = character(),
+                                                        egger_intercept = character(),
+                                                        se = character(),
+                                                        pval = character()
+                            )
                             cresults <<- data.frame(id1 = character(),
                                                     id2 = character(),
+                                                    name1 = character(),
+                                                    name2 = character(),
                                                     nsnps = integer(),
                                                     H0 = integer(),
                                                     H1 = integer(),
@@ -49,6 +75,8 @@ QCReport <- setRefClass("QCReport",
                                                     chrpos = character())
                             plots <<- data.frame(id1 = character(),
                                                  id2 = character(),
+                                                 name1 = character(),
+                                                 name2 = character(),
                                                  type = character())
                             raw.plots <<- list()
                           },
@@ -83,8 +111,10 @@ QCReport <- setRefClass("QCReport",
                             #results[nrow(results) + 1, ] <<- r
                           },
 
-                          add_sresults = function(r) {
-                            sresults <<- rbind(results, r)
+                          add_sresults = function(name, x) {
+                            temp <- get(name)
+                            temp <- rbind(temp, x)
+                            assign(name, temp, inherits = T)
                           },
 
                           add_cresults = function(r) {
@@ -120,13 +150,28 @@ make_report <- function(filepath, filename, dat, report)
                     )
 }
 
-make_results <- function(filepath, filename, report, id.exposure)
+make_results <- function(filepath, filename, report, dat, id.exposure, trait.name)
 {
   rmarkdown::render(input = "report/results.rmd",
                     output_dir = paste0(filepath, "\\", filename, "\\traits"),
-                    output_file = paste0(id.exposure, ".html"),
+                    output_file = paste0(trait.name, ".html"),
                     params = list(report = report,
+                                  dat = dat,
                                   id.exposure = id.exposure,
-                                  new_title = paste0(id.exposure, " results"))
+                                  trait.name = trait.name,
+                                  new_title = paste0(trait.name, " results"))
+                    )
+}
+
+make_outcomes <- function(filepath, filename, report, dat, id.outcome, trait.name)
+{
+  rmarkdown::render(input = "report/outcomes.rmd",
+                    output_dir = paste0(filepath, "\\", filename, "\\traits"),
+                    output_file = paste0(trait.name, ".html"),
+                    params = list(report = report,
+                                  dat = dat,
+                                  id.outcome = id.outcome,
+                                  trait.name = trait.name,
+                                  new_title = paste0(trait.name, " results"))
                     )
 }

@@ -1,10 +1,12 @@
 do_mr <- function(dat, report)
 {
-  res <- TwoSampleMR::mr(dat) %>% TwoSampleMR::generate_odds_ratios()
+  res <- dat[dat$mr_keep.exposure == T,] %>%
+    TwoSampleMR::mr() %>%
+    TwoSampleMR::generate_odds_ratios()
 
-  res %>%
-    dplyr::group_by(id.exposure, id.outcome) %>%
-    dplyr::group_map(~ scatter_plot(.x, .y, dat, report), .keep = T)
+  #res %>%
+  #  dplyr::group_by(id.exposure, id.outcome) %>%
+  #  dplyr::group_map(~ mr_scatter_plot(.x, .y, dat, report), .keep = T)
 
   # Volcano plot of MR results
   res %>%
@@ -23,16 +25,24 @@ do_mr <- function(dat, report)
                             "method", "nsnp", "pval",
                             "or", "or_lci95", "or_uci95")])
 
-  report$add_sresults(sensitivity[c("id.exposure", "id.outcome", "exposure", "outcome",
+  report$add_sresults("sresults", sensitivity[c("id.exposure", "id.outcome", "exposure", "outcome",
                                     "method", "nsnp", "pval",
                                     "or", "or_lci95", "or_uci95")])
+
+  # Heterogeneity
+  hetres <- TwoSampleMR::mr_heterogeneity(dat)
+  report$add_sresults("hetresults", hetres)
+
+  # Pleiotropy
+  pleiores <- TwoSampleMR::mr_pleiotropy_test(dat)
+  report$add_sresults("pleioresults", pleiores)
 
   report$bonferroni <- 0.05 / nrow(main)
 
   return(res)
 }
 
-do_coloc <- function(id1, id2, dat, report,
+do_coloc <- function(dat, id1, id2, report,
                      window = 400, # Kb
                      chrpos = "",
                      nthreads = 1)
@@ -58,26 +68,41 @@ do_coloc <- function(id1, id2, dat, report,
     if (file.exists(f1) && file.exists(f2))
     {
       cdat <- gwasglue::gwasvcf_to_coloc(f1, f2, chrpos)
-      regional_plot(cdat, report)
+      regional_plot(cdat, pairs, i, report)
 
-      return(coloc_sub(cdat[[1]], cdat[[2]], pairs[i, "id.x"], pairs[i, "id.y"], chrpos, report))
+      return(coloc_sub(cdat[[1]], cdat[[2]], pairs, i, chrpos, report))
     } else if (!file.exists(f1) && !file.exists(f2))
     {
       cdat <- gwasglue::ieugwasr_to_coloc(pairs[i, "id.x"], pairs[i, "id.y"], chrpos)
-      regional_plot(cdat, report)
+      regional_plot(cdat, pairs, i, report)
 
-      return(coloc_sub(cdat[[1]], cdat[[2]], pairs[i, "id.x"], pairs[i, "id.y"], chrpos, report))
+      return(coloc_sub(cdat[[1]], cdat[[2]], pairs, i, chrpos, report))
     } else {
       # One is file, one is not
       ## TODO me :(
     }
   }, mc.cores = nthreads)
-
   return(cres)
 }
 
-coloc_sub <- function(dat1, dat2, id1, id2, chrpos, report)
+coloc_sub <- function(dat1, dat2, pairs, i, chrpos, report)
 {
+  if (!length(dat1) || !length(dat2))
+  {
+    report$add_cresults(list(id1 = pairs[i, "id.x"],
+                             id2 = pairs[i, "id.y"],
+                             name1 = pairs[i, "trait.x"],
+                             name2 = pairs[i, "trait.y"],
+                             nsnps = 0,
+                             H0 = 0,
+                             H1 = 0,
+                             H2 = 0,
+                             H3 = 0,
+                             H4 = 0,
+                             chrpos = chrpos))
+    return()
+  }
+
   # MAFs should be similar and, as some GWAS are missing MAFs,
   # these should be mergeable between the two datasets
   if (any(is.na(dat1$MAF)) || any(is.na(dat2$MAF)))
@@ -88,24 +113,29 @@ coloc_sub <- function(dat1, dat2, id1, id2, chrpos, report)
   # Even after merge, if any MAF are missing, it's probs
   # best to ignore this coloc
   # TODO - better way of dealing with this?
-  if (any(is.na(dat1$MAF)) || any(is.na(dat2$MAF)))
+  if (any(is.na(dat1$MAF)) || any(is.na(dat2$MAF)) ||
+      length(dat1$snp) < 50 || length(dat2$snp) < 50)
   {
-    report$add_cresults(list(id1 = id1,
-                             id2 = id2,
-                             nsps = 0,
-                             H0 = 0,
-                             H1 = 0,
-                             H2 = 0,
-                             H3 = 0,
-                             H4 = 0,
+    report$add_cresults(list(id1 = pairs[i, "id.x"],
+                             id2 = pairs[i, "id.y"],
+                             name1 = pairs[i, "trait.x"],
+                             name2 = pairs[i, "trait.y"],
+                             nsnps = length(dat1$snp),
+                             H0 = -1,
+                             H1 = -1,
+                             H2 = -1,
+                             H3 = -1,
+                             H4 = -1,
                              chrpos = chrpos))
-    return(NA)
+    return()
   }
 
   cres <- coloc::coloc.abf(dat1, dat2)
 
-  report$add_cresults(list(id1 = id1,
-                           id2 = id2,
+  report$add_cresults(list(id1 = pairs[i, "id.x"],
+                           id2 = pairs[i, "id.y"],
+                           name1 = pairs[i, "trait.x"],
+                           name2 = pairs[i, "trait.y"],
                            nsnps = cres$summary[[1]],
                            H0 = cres$summary[[2]],
                            H1 = cres$summary[[3]],

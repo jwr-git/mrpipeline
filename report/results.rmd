@@ -6,7 +6,9 @@ output:
     toc_float: true
 params:
   report: "report"
+  dat: "dat"
   id.exposure: "id.exposure"
+  trait.name: "trait.name"
   new_title: "Per-trait results"
 title: "`r params$new_title`"
 ---
@@ -21,10 +23,10 @@ results <- results[results$id.exposure == id.exposure, ]
 cresults <- params$report$cresults
 cresults <- cresults[cresults$id1 == id.exposure, ]
 
-sensitivity <- report$sresults
+sensitivity <- params$report$sresults
 sensitivity <- sensitivity[sensitivity$id.exposure == id.exposure, ]
 
-plots <- report$plots
+plots <- params$report$plots
 plots <- plots[plots$id1 == id.exposure, ]
 
 # raw.plots have the same indices as plots
@@ -36,26 +38,64 @@ raw.plots <- raw.plots[as.integer(rownames(plots[plots$id1 == id.exposure, ]))]
 rownames(plots) <- 1:nrow(plots)
 ```
 
-# Back to Main Page
-[Click to go back to the Main Page.](./../report.html)
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
 
-# QC Graphs {.tabset}
+# [Back to Main Page](./../report.html)
 
-This section contains plots which can be helpful at the QC stage.
+# Diagnostic Plots
 
-## F-stat plot
-
-A plot of Z-scores, or $\beta^{2}/SE^{2}$, against P value for each exposure SNP which can help detect potentially problematic SNPs. The shape of the graph should be parabolic, roughly of the form $y=x^{2}$, with potentially problematic SNPs lying outside of that curve. A curve of best fit is also provided as a rough aid if there are enough SNPs.
-
-```{r f_plot, echo = F, message = F, warning = F, results = F}
-raw.plots[as.integer(rownames(plots[plots$type == "f", ]))]
+```{r}
+if (nrow(params$dat) < 3) {
+  cat("No plots generated due to insufficient SNPs.")
+}
 ```
 
-# MR Results {.tabset}
+`r if (nrow(params$dat) < 3) { "\\begin{comment}" }`
+
+## Z score plot
+
+A plot of Z score (beta / SE) against P value for each exposure SNP which can help detect potentially problematic SNPs. The shape of the graph should be parabolic, roughly of the form $y=x^{2}$, with potentially problematic SNPs lying outside of that curve. A curve of best fit is also provided as a rough aid if there are enough SNPs.
+
+```{r f-plot, warning = F, dpi=300, fig.width=2, fig.height=2}
+plotly::ggplotly(automrpipeline::interactive_z_plot(params$dat))
+```
+`r if (nrow(params$dat) < 3) { "\\end{comment}" }`
+
+## Scatter plots {.tabset}
+
+Scatter plots of the SNP-exposure and SNP-outcome effects to potentially detect problematic SNPs.
+
+```{r scatter-plot, warning = F, results = "asis", dpi=300, fig.width=2, fig.height=2}
+plotlist <- htmltools::tagList() # Work around for print and plotly::ggplotly not working nicely together
+j <- 0
+for (i in unique(dat$id.outcome)) {
+  j <- j + 1
+  p <- automrpipeline::interactive_scatter_plot(params$dat, params$id.exposure, i)
+  if (!is.null(p)) {
+    cat("  \n### ", unique(dat[dat$id.outcome == i,]$outcome), "  \n")
+    plotlist[[j]] <- as.widget(plotly::ggplotly(p))
+    print(htmltools::tagList(plotlist[[j]]))
+    cat("  \n")
+  } else {
+    cat("No plot generated.")
+  }
+}
+```
+
+<!--
+## SNP-Effects Forest plot
+-->
+# MR Results
 
 Results for the main MR analyses (Wald ratio (WR) and inverse variance weighted (IVW)) are given here. The WR method is performed on single-SNP instruments, whilst the IVW method is performed on everything else.
 
-```{r results_mr}
+```{r results-mr}
 dplyr::rename(results,
               Exposure.ID = id.exposure,
               Outcome.ID = id.outcome,
@@ -67,8 +107,18 @@ dplyr::rename(results,
               OR = or,
               Lower.95ci = or_lci95,
               Upper.95ci = or_uci95) %>%
+  dplyr::select(-Exposure.ID, -Outcome.ID) %>%
   dplyr::relocate(Outcome, .after = Exposure) %>%
-  DT::datatable(options = list(order = list(7, "asc"))) %>%
+  DT::datatable(rownames = F,
+                filter = 'top',                
+                extensions = 'Buttons',
+                caption = "MR results for this exposure on all outcomes",
+                options = list(order = list(5, "desc"), 
+                               dom = 'Bfrtip',
+                               buttons = list('copy',
+                                              list(extend = 'collection', 
+                                                   buttons = c('csv', 'excel'), 
+                                                   text = 'Download')))) %>%
   DT::formatSignif(columns = c("P.value", "OR", "Lower.95ci", "Upper.95ci"), digits = 3)
 ```
 
@@ -76,11 +126,87 @@ dplyr::rename(results,
 # Sensitivity Results {.tabset}
 
 Results are presented here for Sensitivity analyses.
-TODO Not yet added -- unsure if worthwhile as if using QTLs then most analyses should be instruments with few SNPs.
+
+## Other MR Methods
+
+```{r sresults}
+res <- params$report$sresults
+res[res$id.exposure == params$id.exposure, ] %>%
+  dplyr::rename(Exposure.ID = id.exposure,
+              Outcome.ID = id.outcome,
+              Outcome = outcome,
+              Exposure = exposure,
+              Method = method,
+              SNPs = nsnp,
+              P.value = pval,
+              OR = or,
+              Lower.95ci = or_lci95,
+              Upper.95ci = or_uci95) %>%
+  dplyr::select(-Exposure.ID, -Outcome.ID) %>%
+  dplyr::relocate(Outcome, .after = Exposure) %>%
+  DT::datatable(rownames = F,
+                filter = 'top',
+                extensions = 'Buttons',
+                caption = "MR Sensitivity results",
+                options = list(dom = 'Bfrtip', 
+                               buttons = list('copy',
+                                              list(extend = 'collection', 
+                                                   buttons = c('csv', 'excel'), 
+                                                   text = 'Download')))) %>%
+  DT::formatSignif(columns = c("P.value", "OR", "Lower.95ci", "Upper.95ci"), digits = 3)
+```
 
 ## Heterogeneity
 
+```{r heterogeneity}
+res <- params$report$hetresults
+res[res$id.exposure == params$id.exposure, ] %>%
+  dplyr::rename(Exposure.ID = id.exposure,
+              Outcome.ID = id.outcome,
+              Outcome = outcome,
+              Exposure = exposure,
+              Method = method,
+              Q.df = Q_df,
+              Q.Pval = Q_pval) %>%
+  dplyr::relocate(Outcome, .after = Exposure) %>%
+  DT::datatable(rownames = F,
+                filter = 'top',
+                extensions = 'Buttons',
+                caption = "MR Heterogeneity results",
+                options = list(dom = 'Bfrtip', 
+                               buttons = list('copy',
+                                              list(extend = 'collection', 
+                                                   buttons = c('csv', 'excel'), 
+                                                   text = 'Download')))) %>%
+  DT::formatSignif(columns = c("Q.Pval", "Q"), digits = 3)
+
+```
+
 ## Horizontal Pleiotropy
+
+```{r pleiotropy}
+res <- params$report$pleioresults
+res[res$id.exposure == params$id.exposure, ] %>%
+  dplyr::rename(Exposure.ID = id.exposure,
+              Outcome.ID = id.outcome,
+              Outcome = outcome,
+              Exposure = exposure,
+              Egger.Intercept = egger_intercept,
+              SE = se,
+              P.Value = pval) %>%
+  dplyr::relocate(Outcome, .after = Exposure) %>%
+  DT::datatable(rownames = F,
+                filter = 'top',
+                extensions = 'Buttons',
+                caption = "MR Pleiotropy results",
+                options = list(dom = 'Bfrtip', 
+                               buttons = list('copy',
+                                              list(extend = 'collection', 
+                                                   buttons = c('csv', 'excel'), 
+                                                   text = 'Download')))) %>%
+  DT::formatSignif(columns = c("Egger.Intercept", "P.Value", "SE"), digits = 3)
+
+```
 
 ## Leave-one-out Analyses
 
@@ -91,16 +217,16 @@ TODO Not yet added -- unsure if worthwhile as if using QTLs then most analyses s
 Plots shown here include scatter and forest plots of results, if they are generated (some may require many SNPs).
 
 ## Volcano Plot {.tabset}
-```{r volcano_plot, echo = F, message = F, warning = F, results = F}
+```{r volcano-plot, echo = F, message = F, warning = F, results = F}
 raw.plots[as.integer(rownames(plots[plots$type == "volcano", ]))]
 ```
 
 ## PheWAS-like Plot {.tabset}
-```{r phewas_plot, echo = F, message = F, warning = F, results = F}
+```{r phewas-plot, echo = F, message = F, warning = F, results = F}
 raw.plots[as.integer(rownames(plots[plots$type == "phewas", ]))]
 ```
-
-```{r scatter_plot, echo = F, message = F, warning = F, results = "asis"}
+<!--
+```{r scatter-plot2, echo = F, message = F, warning = F, results = "asis"}
 if (!nrow(plots[plots$type == "scatter", ]) || all(is.na(plots[plots$type == "scatter", ]))) {
   cat("No plots generated.")
 } else {
@@ -116,29 +242,45 @@ if (!nrow(plots[plots$type == "scatter", ]) || all(is.na(plots[plots$type == "sc
   }
 }
 ```
-
+-->
 
 # Colocalisation
 
 Colocalisaton uses the coloc.abf function from the coloc R package. This section should be expanded to include conditional analyses and/or pwcoco, or other colocalisation methods.
 
-```{r coloc_table}
-dplyr::rename(cresults,
-              Exposure.ID = id1,
-              Outcome.ID = id2,
-              SNPs = nsnps,
-              ChrPos = chrpos) %>%
-  DT::datatable(rownames = F,
-                extensions = c("Buttons"),
-                options = list(dom = "Bfrtip", buttons = c("copy", "csv"))) %>%
-  DT::formatPercentage(c("H0", "H1", "H2", "H3", "H4"), 2)
+```{r coloc-table}
+cresults <- cresults[cresults["nsnps"] > 50, ]
+if (length(cresults) && nrow(cresults) > 0) {
+cresults %>%
+    dplyr::rename(Exposure = name1,
+                  Outcome = name2,
+                  SNPs = nsnps,
+                  ChrPos = chrpos) %>%
+    dplyr::select(-id1, -id2) %>%
+    DT::datatable(rownames = F,
+                  escape = F,
+                  filter = 'top',
+                  extensions = c("Buttons"),
+                  options = list(order = list(7, "desc"), 
+                                 dom = "Bfrtip", 
+                                 buttons = list('copy',
+                                                list(extend = 'collection', 
+                                                     buttons = c('csv', 'excel'), 
+                                                     text = 'Download')))) %>%
+    DT::formatPercentage(c("H0", "H1", "H2", "H3", "H4"), 2)
+} else {
+  cat("No colocalisation results were generated.")
+}
 ```
+
+`r if (!length(cresults) || nrow(cresults) < 1) { "\\begin{comment}" }`
 
 ## Regional Plots {.tabset}
 
 These are regional plots for the regions used in the colocalisation analysis. Regions to plot are decided naively from the "lead" SNP, i.e. the SNP with the lowest P value at the minute.
 
-```{r regional_plot, echo = F, message = F, results = "asis"}
+
+```{r regional-plot, echo = F, message = F, results = "asis"}
 if (length(plots[plots$type == "regional", ]) == 0) {
   cat("No plots generated.")
 } else {
@@ -148,10 +290,12 @@ if (length(plots[plots$type == "regional", ]) == 0) {
       next
     }
     
-    cat("  \n###", plots[idx, 'id1'], "&", plots[idx, 'id2'], "  \n")
+    cat("  \n###", plots[idx, 'name2'], "  \n")
     grid.newpage()
     grid.draw(raw.plots[[idx]])
     cat("  \n")
   }
 }
 ```
+
+`r if (!length(cresults) || nrow(cresults) < 1) { "\\end{comment}" }`

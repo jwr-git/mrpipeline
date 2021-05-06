@@ -1,0 +1,34 @@
+---
+output:
+  html_document:
+    toc: true
+    toc_depth: 2
+    toc_float: true
+params:
+  report: "report"
+  dat: "dat"
+  id.outcome: "id.outcome"
+  trait.name: "trait.name"
+  new_title: "Per-trait results"
+title: "`r params$new_title`"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F)
+
+# Subset correct results for reporting
+results <- params$report$results
+results <- results[results$id.outcome == id.outcome, ]
+```
+
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+# [Back to Main Page](./../report.html)
+
+**TBD**.

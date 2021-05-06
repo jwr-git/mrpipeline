@@ -9,4 +9,4 @@ Description: More about what it does (maybe more than one line)
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
-Imports: TwoSampleMR, ieugwasr, gwasglue, gwasvcf, tools, dplyr, ggplot2, gassocplot, grid, ggrepel
+Imports: TwoSampleMR, ieugwasr, gwasglue, gwasvcf, tools, dplyr, ggplot2, gassocplot, grid, ggrepel, plotly
