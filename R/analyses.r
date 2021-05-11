@@ -37,6 +37,15 @@ do_mr <- function(dat, report)
   pleiores <- TwoSampleMR::mr_pleiotropy_test(dat)
   report$add_sresults("pleioresults", pleiores)
 
+  # Steiger
+  steigerres <- TwoSampleMR::directionality_test(dat)
+  steigerres$flag <- ifelse(steigerres$correct_causal_direction == T & steigerres$steiger_pval < 0.05,
+                            "True",
+                            ifelse(steigerres$correct_causal_direction == F & steigerres$steiger_pval < 0.05,
+                                   "False",
+                                   "Unknown"))
+  report$add_sresults("steigerresults", steigerres)
+
   report$bonferroni <- 0.05 / nrow(main)
 
   return(res)
@@ -99,7 +108,8 @@ coloc_sub <- function(dat1, dat2, pairs, i, chrpos, report)
                              H2 = 0,
                              H3 = 0,
                              H4 = 0,
-                             chrpos = chrpos))
+                             chrpos = chrpos,
+                             plot = ""))
     return()
   }
 
@@ -126,7 +136,8 @@ coloc_sub <- function(dat1, dat2, pairs, i, chrpos, report)
                              H2 = -1,
                              H3 = -1,
                              H4 = -1,
-                             chrpos = chrpos))
+                             chrpos = chrpos,
+                             plot = ""))
     return()
   }
 
@@ -142,6 +153,20 @@ coloc_sub <- function(dat1, dat2, pairs, i, chrpos, report)
                            H2 = cres$summary[[4]],
                            H3 = cres$summary[[5]],
                            H4 = cres$summary[[6]],
-                           chrpos = chrpos))
+                           chrpos = chrpos,
+                           plot = ""))
   return(cres)
+}
+
+do_heterogeneity <- function(res, report)
+{
+  #res_nosens <- res[res$method %in% c("Wald ratio", "Inverse variance weighted"), ]
+
+  # Heterogeneity if more than 1 SNP
+  #if (length(dat) && nrow(dat) > 1) {
+  #  hetero <- TwoSampleMR::mr_ivw(res_nosens$beta.exposure,
+  #                                res_nosens$beta.outcome,
+  #                                res_nosens$se.exposure,
+  #                                res_nosens$se.outcome)
+  #}
 }

@@ -5,6 +5,7 @@ QCReport <- setRefClass("QCReport",
                                       sresults = "data.frame",
                                       hetresults = "data.frame",
                                       pleioresults = "data.frame",
+                                      steigerresults = "data.frame",
                                       cresults = "data.frame",
                                       bonferroni = "numeric",
                                       plots = "data.frame",
@@ -62,6 +63,16 @@ QCReport <- setRefClass("QCReport",
                                                         se = character(),
                                                         pval = character()
                             )
+                            steigerresults <<- data.frame(id.exposure = character(),
+                                                          id.outcome = character(),
+                                                          exposure = character(),
+                                                          outcome = character(),
+                                                          snp_r2.exposure = integer(),
+                                                          snp_r2.outcome = integer(),
+                                                          correct_causal_direction = logical(),
+                                                          steiger_pval = integer(),
+                                                          flag = character()
+                            )
                             cresults <<- data.frame(id1 = character(),
                                                     id2 = character(),
                                                     name1 = character(),
@@ -72,7 +83,9 @@ QCReport <- setRefClass("QCReport",
                                                     H2 = integer(),
                                                     H3 = integer(),
                                                     H4 = integer(),
-                                                    chrpos = character())
+                                                    chrpos = character(),
+                                                    plot = character()
+                            )
                             plots <<- data.frame(id1 = character(),
                                                  id2 = character(),
                                                  name1 = character(),

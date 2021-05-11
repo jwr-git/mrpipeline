@@ -1,6 +1,7 @@
 ---
 output:
   html_document:
+    md_extensions: +raw_html
     toc: true
     toc_depth: 2
     toc_float: true

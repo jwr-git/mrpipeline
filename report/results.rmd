@@ -1,6 +1,7 @@
 ---
 output:
   html_document:
+    md_extensions: +raw_html
     toc: true
     toc_depth: 2
     toc_float: true
@@ -39,10 +40,25 @@ rownames(plots) <- 1:nrow(plots)
 ```
 
 <style type="text/css">
+#TOC {
+  left: 40px;
+  margin: 20px 0px 25px 0px;
+}
+
 .main-container {
-  max-width: 1800px;
-  margin-left: auto;
+  max-width: 2400px;
+  margin-left: 100px;
   margin-right: auto;
+}
+
+.imgTooltip {
+      display: none;
+}
+
+.ItemsTooltip:hover .imgTooltip {
+      display: block;
+      position: absolute;
+      z-index: 1;
 }
 </style>
 
@@ -95,18 +111,27 @@ for (i in unique(dat$id.outcome)) {
 
 Results for the main MR analyses (Wald ratio (WR) and inverse variance weighted (IVW)) are given here. The WR method is performed on single-SNP instruments, whilst the IVW method is performed on everything else.
 
-```{r results-mr}
-dplyr::rename(results,
-              Exposure.ID = id.exposure,
-              Outcome.ID = id.outcome,
-              Outcome = outcome,
-              Exposure = exposure,
-              Method = method,
-              SNPs = nsnp,
-              P.value = pval,
-              OR = or,
-              Lower.95ci = or_lci95,
-              Upper.95ci = or_uci95) %>%
+```{r results-mr, message = F, warning = F, echo = F}
+steiger <- params$report$steigerresults
+steiger <- steiger[steiger$id.exposure == params$id.exposure,]
+
+results %>%
+  dplyr::left_join(steiger) %>%
+  dplyr::rename(Exposure.ID = id.exposure,
+                Outcome.ID = id.outcome,
+                Outcome = outcome,
+                Exposure = exposure,
+                Method = method,
+                SNPs = nsnp,
+                P.value = pval,
+                OR = or,
+                Lower.95ci = or_lci95,
+                Upper.95ci = or_uci95,
+                r2.exposure = snp_r2.exposure,
+                r2.outcome = snp_r2.outcome,
+                Direction = correct_causal_direction,
+                Steiger.P = steiger_pval,
+                Steiger.Flag = flag) %>%
   dplyr::select(-Exposure.ID, -Outcome.ID) %>%
   dplyr::relocate(Outcome, .after = Exposure) %>%
   DT::datatable(rownames = F,
@@ -119,98 +144,15 @@ dplyr::rename(results,
                                               list(extend = 'collection', 
                                                    buttons = c('csv', 'excel'), 
                                                    text = 'Download')))) %>%
-  DT::formatSignif(columns = c("P.value", "OR", "Lower.95ci", "Upper.95ci"), digits = 3)
+  DT::formatSignif(columns = c("P.value", 
+                               "OR", 
+                               "Lower.95ci", 
+                               "Upper.95ci",
+                               "r2.exposure",
+                               "r2.outcome",
+                               "Steiger.P"), 
+                   digits = 3)
 ```
-
-`r if (length(sensitivity) == 0) { "\\begin{comment}" }`
-# Sensitivity Results {.tabset}
-
-Results are presented here for Sensitivity analyses.
-
-## Other MR Methods
-
-```{r sresults}
-res <- params$report$sresults
-res[res$id.exposure == params$id.exposure, ] %>%
-  dplyr::rename(Exposure.ID = id.exposure,
-              Outcome.ID = id.outcome,
-              Outcome = outcome,
-              Exposure = exposure,
-              Method = method,
-              SNPs = nsnp,
-              P.value = pval,
-              OR = or,
-              Lower.95ci = or_lci95,
-              Upper.95ci = or_uci95) %>%
-  dplyr::select(-Exposure.ID, -Outcome.ID) %>%
-  dplyr::relocate(Outcome, .after = Exposure) %>%
-  DT::datatable(rownames = F,
-                filter = 'top',
-                extensions = 'Buttons',
-                caption = "MR Sensitivity results",
-                options = list(dom = 'Bfrtip', 
-                               buttons = list('copy',
-                                              list(extend = 'collection', 
-                                                   buttons = c('csv', 'excel'), 
-                                                   text = 'Download')))) %>%
-  DT::formatSignif(columns = c("P.value", "OR", "Lower.95ci", "Upper.95ci"), digits = 3)
-```
-
-## Heterogeneity
-
-```{r heterogeneity}
-res <- params$report$hetresults
-res[res$id.exposure == params$id.exposure, ] %>%
-  dplyr::rename(Exposure.ID = id.exposure,
-              Outcome.ID = id.outcome,
-              Outcome = outcome,
-              Exposure = exposure,
-              Method = method,
-              Q.df = Q_df,
-              Q.Pval = Q_pval) %>%
-  dplyr::relocate(Outcome, .after = Exposure) %>%
-  DT::datatable(rownames = F,
-                filter = 'top',
-                extensions = 'Buttons',
-                caption = "MR Heterogeneity results",
-                options = list(dom = 'Bfrtip', 
-                               buttons = list('copy',
-                                              list(extend = 'collection', 
-                                                   buttons = c('csv', 'excel'), 
-                                                   text = 'Download')))) %>%
-  DT::formatSignif(columns = c("Q.Pval", "Q"), digits = 3)
-
-```
-
-## Horizontal Pleiotropy
-
-```{r pleiotropy}
-res <- params$report$pleioresults
-res[res$id.exposure == params$id.exposure, ] %>%
-  dplyr::rename(Exposure.ID = id.exposure,
-              Outcome.ID = id.outcome,
-              Outcome = outcome,
-              Exposure = exposure,
-              Egger.Intercept = egger_intercept,
-              SE = se,
-              P.Value = pval) %>%
-  dplyr::relocate(Outcome, .after = Exposure) %>%
-  DT::datatable(rownames = F,
-                filter = 'top',
-                extensions = 'Buttons',
-                caption = "MR Pleiotropy results",
-                options = list(dom = 'Bfrtip', 
-                               buttons = list('copy',
-                                              list(extend = 'collection', 
-                                                   buttons = c('csv', 'excel'), 
-                                                   text = 'Download')))) %>%
-  DT::formatSignif(columns = c("Egger.Intercept", "P.Value", "SE"), digits = 3)
-
-```
-
-## Leave-one-out Analyses
-
-`r if (length(sensitivity) == 0) { "\\end{comment}" }`
 
 # Results Plots {.tabset}
 
@@ -248,15 +190,41 @@ if (!nrow(plots[plots$type == "scatter", ]) || all(is.na(plots[plots$type == "sc
 
 Colocalisaton uses the coloc.abf function from the coloc R package. This section should be expanded to include conditional analyses and/or pwcoco, or other colocalisation methods.
 
+`r if (!length(cresults) || nrow(cresults) < 1 || !length(cresults[cresults["nsnps"] > 50, ])) { "\\begin{comment}" }`
+
+```{r regional-plot, echo = F, message = F, include = F, dev = 'png', fig.show = 'hide'}
+if (length(plots[plots$type == "regional", ]) > 0) {
+  for (idx in as.integer(rownames(plots[plots$type == "regional", ])))
+  {
+    if (all(is.na(raw.plots[[idx]]))) {
+      next
+    }
+    grid.newpage()
+    grid.draw(raw.plots[[idx]])
+  }
+}
+```
+
 ```{r coloc-table}
+for (i in 1:nrow(cresults)) {
+    tryCatch({
+      cresults[i, "plot"] <- sprintf("<a class='ItemsTooltip' target='_blank'><img class='imgTooltip' src='%s'/>Region</a>", knitr::image_uri(knitr::fig_chunk('regional-plot', 'png', i)))
+    },
+    error = function(e) {
+      cresults[i, "plot"] <- "No plot"
+    })
+}
 cresults <- cresults[cresults["nsnps"] > 50, ]
+
 if (length(cresults) && nrow(cresults) > 0) {
-cresults %>%
+  cresults %>%
     dplyr::rename(Exposure = name1,
                   Outcome = name2,
                   SNPs = nsnps,
-                  ChrPos = chrpos) %>%
+                  ChrPos = chrpos,
+                  Plot = plot) %>%
     dplyr::select(-id1, -id2) %>%
+    dplyr::relocate(Plot, .after = Outcome) %>%
     DT::datatable(rownames = F,
                   escape = F,
                   filter = 'top',
@@ -273,29 +241,4 @@ cresults %>%
 }
 ```
 
-`r if (!length(cresults) || nrow(cresults) < 1) { "\\begin{comment}" }`
-
-## Regional Plots {.tabset}
-
-These are regional plots for the regions used in the colocalisation analysis. Regions to plot are decided naively from the "lead" SNP, i.e. the SNP with the lowest P value at the minute.
-
-
-```{r regional-plot, echo = F, message = F, results = "asis"}
-if (length(plots[plots$type == "regional", ]) == 0) {
-  cat("No plots generated.")
-} else {
-  for (idx in as.integer(rownames(plots[plots$type == "regional", ])))
-  {
-    if (all(is.na(raw.plots[[idx]]))) {
-      next
-    }
-    
-    cat("  \n###", plots[idx, 'name2'], "  \n")
-    grid.newpage()
-    grid.draw(raw.plots[[idx]])
-    cat("  \n")
-  }
-}
-```
-
-`r if (!length(cresults) || nrow(cresults) < 1) { "\\end{comment}" }`
+`r if (!length(cresults) || nrow(cresults) < 1 || !length(cresults[cresults["nsnps"] > 50, ])) { "\\end{comment}" }`

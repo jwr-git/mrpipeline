@@ -42,6 +42,7 @@ read_datasets <- function(id1, id2,
       # Annotate
       id1$annotate(id1$info$id[i], unique(dat$exposure))
 
+      # Reporting
       if (length(dat)) {
         pre_clump <- nrow(dat)
 

@@ -16,10 +16,25 @@ knitr::opts_chunk$set(echo = F)
 ```
 
 <style type="text/css">
+#TOC {
+  left: 40px;
+  margin: 20px 0px 25px 0px;
+}
+
 .main-container {
-  max-width: 1800px;
-  margin-left: auto;
+  max-width: 2400px;
+  margin-left: 100px;
   margin-right: auto;
+}
+
+.imgTooltip {
+      display: none;
+}
+
+.ItemsTooltip:hover .imgTooltip {
+      display: block;
+      position: absolute;
+      z-index: 1;
 }
 </style>
 
@@ -185,8 +200,12 @@ MR results are presented here for the Wald ratio (WR) and inverse variance weigh
 
 There were a total of `r 0.05 / params$report$bonferroni` MR tests conducted. A Bonferroni P-value threshold would therefore be `r params$report$bonferroni` ($0.05 / tests$).
 
-```{r mr}
+```{r mr, echo = F, message = F}
+steiger <- params$report$steigerresults %>% 
+  dplyr::select(id.exposure, id.outcome, flag)
+
 params$report$results %>%
+  dplyr::left_join(steiger) %>%
   dplyr::rename(Exposure.ID = id.exposure,
                 Outcome.ID = id.outcome,
                 Outcome = outcome,
@@ -196,7 +215,8 @@ params$report$results %>%
                 P.value = pval,
                 OR = or,
                 Lower.95ci = or_lci95,
-                Upper.95ci = or_uci95) %>%
+                Upper.95ci = or_uci95,
+                Steiger.Flag = flag) %>%
   dplyr::select(-Exposure.ID, -Outcome.ID) %>%
   dplyr::relocate(Outcome, .after = Exposure) %>%
   DT::datatable(rownames = F,
@@ -220,23 +240,50 @@ params$report$results %>%
   <li><code>OR</code>: MR odds ratios.</li>
   <li><code>Lower.95ci</code>: Lower 95% confidence interval.</li>
   <li><code>Upper.95ci</code>: Upper 95% confidence interval.</li>
+  <li><code>Steiger.Flag</code>: Flag for the Steiger filtering results: true, direction of effect is from exposure to the outcome; false, the direction of effect is from outcome to the exposure; unknown, Steiger P value is > 0.05.</li>
 </ul>
 
 # Colocalisation Results
 
 Here are all of the colocalisation results. Regional plots are available in the per-trait reports.
 
+```{r regional-plot, echo = F, message = F, include = F, dev = 'png', fig.show = 'hide'}
+if (length(params$report$plots[params$report$plots$type == "regional", ]) > 0) {
+  for (idx in as.integer(rownames(params$report$plots[params$report$plots$type == "regional", ])))
+  {
+    if (all(is.na(params$report$raw.plots[[idx]]))) {
+      next
+    }
+    grid.newpage()
+    grid.draw(params$report$raw.plots[[idx]])
+  }
+}
+```
+
 ```{r coloc}
 cresults <- params$report$cresults
-cresults <- cresults[cresults['nsnps'] > 50, ]
+
+for (i in 1:nrow(cresults)) {
+    tryCatch({
+      cresults[i, "plot"] <- sprintf("<a class='ItemsTooltip' target='_blank'><img class='imgTooltip' src='%s'/>Region</a>", knitr::image_uri(knitr::fig_chunk('regional-plot', 'png', i)))
+    },
+    error = function(e) {
+      cresults[i, "plot"] <- "No plot"
+    })
+}
+cresults <- cresults[cresults["nsnps"] > 50, ]
+
 if (length(cresults)) {
   cresults %>%
     dplyr::rename(Exposure = name1,
                   Outcome = name2,
+                  Plot = plot,
                   SNPs = nsnps,
                   ChrPos = chrpos) %>%
     dplyr::select(-id1, -id2) %>%
+    dplyr::relocate(Plot, .after = Outcome) %>%
     DT::datatable(rownames = F,
+                  escape = F,
                   filter = 'top',
                   extensions = c("Buttons"),
                   options = list(order = list(7, "desc"), 
@@ -254,6 +301,7 @@ if (length(cresults)) {
 <ul>
   <li><code>Exposure</code>: Name for Exposures.</li>
   <li><code>Outcome</code>: Name for Outcomes.</li>
+  <li><code>Plot</code>: Hover over for the regional plot.</li>
   <li><code>SNPs</code>: Number of SNPs that form the instrument.</li>
   <li><code>H0-4</code>: Posterior probability for hypotheses 0 through 4.</li>
   <li><code>ChrPos</code>: Chromosome and position range used to extract SNPs for colocalisation.</li>
