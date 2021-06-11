@@ -32,4 +32,43 @@ results <- results[results$id.outcome == id.outcome, ]
 
 # [Back to Main Page](./../report.html)
 
-**TBD**.
+# Outcome SNPs
+
+This table details the final list of formatted SNPs for the outcome dataset which were used in the MR analyses.
+
+```{r out-dat}
+dat <- params$dat[params$dat$id.outcome == id.outcome, ]
+dat[, colnames(dat) %in% c("SNP",
+                           "effect_allele.outcome",
+                           "other_allele.outcome",
+                           "beta.outcome",
+                           "eaf.outcome",
+                           "chr",
+                           "pos",
+                           "se.outcome",
+                           "pval.outcome",
+                           "outcome",
+                           "proxy.outcome",
+                           "proxy_snp.outcome")] %>%
+  dplyr::rename(Eff.Allele = effect_allele.outcome,
+                Alt.Allele = other_allele.outcome,
+                Beta = beta.outcome,
+                EAF = eaf.outcome,
+                Chr = chr,
+                Pos = pos,
+                SE = se.outcome,
+                P.value = pval.outcome,
+                Outcome = outcome,
+                Proxy = proxy.outcome,
+                Proxy.SNP = proxy_snp.outcome) %>%
+  DT::datatable(rownames = F,
+                caption = "Details for outcome SNPs, or their proxies, which were included in the MR analysis.",
+                extensions = c("Buttons"),
+                options = list(order = list(8, "asc"), 
+                               dom = "BDfrtip", 
+                               buttons = list('copy',
+                                              list(extend = 'collection', 
+                                                   buttons = c('csv', 'excel'), 
+                                                   text = 'Download')))) %>%
+  DT::formatSignif(columns = c("P.value"), digits = 3)
+```

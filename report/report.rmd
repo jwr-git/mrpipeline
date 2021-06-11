@@ -98,6 +98,7 @@ params$dat[, colnames(params$dat) %in% c("SNP",
                                         "exposure",
                                         "mr_keep.exposure",
                                         "f.stat.exposure")] %>%
+  unique() %>%
   dplyr::rename(Eff.Allele = effect_allele.exposure,
                 Alt.Allele = other_allele.exposure,
                 Beta = beta.exposure,
@@ -190,9 +191,72 @@ params$dat[, colnames(params$dat) %in% c("SNP",
                                               list(extend = 'collection', 
                                                    buttons = c('csv', 'excel'), 
                                                    text = 'Download')))) %>%
-
   DT::formatSignif(columns = c("P.value"), digits = 3)
 ```
+
+# Overview of Results
+
+This shows a basic overview of all of the results, which are given in more detail below and in individual reports. This overview shows a basic "Pass" or "Fail" mark if that exposure-outcome pair passes or fails that analysis.
+
+```{r}
+mrres <- params$report$results %>%
+  dplyr::select(id.exposure, id.outcome, exposure, outcome, pval) %>%
+  dplyr::mutate(mrflag = ifelse(pval < 0.05, "Pass", "Fail"))
+
+steigerres <- params$report$steigerresults %>%
+  dplyr::select(id.exposure, id.outcome, flag) %>%
+  dplyr::mutate(flag = ifelse(flag == "True", "Pass",
+                              ifelse(flag == "Unknown", "Uncertain", "Fail")))
+
+colocres <- params$report$cresults %>%
+  dplyr::select(name1, name2, nsnps, H4) %>%
+  dplyr::rename(exposure = name1, outcome = name2) %>%
+  dplyr::mutate(colocflag = ifelse(H4 > 0.8 & nsnps > 50, "Strong",
+                                   ifelse(H4 > 0.5 & nsnps > 50, "Moderate", "Weak"))) %>%
+  dplyr::mutate(colocflag = ifelse(colocflag == "", "NA", colocflag))
+
+dplyr::left_join(mrres, steigerres, by = c("id.exposure", "id.outcome")) %>%
+  dplyr::left_join(colocres, by = c("exposure", "outcome")) %>%
+  dplyr::select(-pval, -nsnps, -H4) %>%
+  dplyr::rename(Exposure.ID = id.exposure,
+                Outcome.ID = id.outcome,
+                Exposure = exposure,
+                Outcome = outcome,
+                MR.Pass = mrflag,
+                Steiger.Pass = flag,
+                Coloc.Pass = colocflag) %>%
+  dplyr::relocate(Exposure, Outcome,
+                  Exposure.ID, Outcome.ID,
+                  MR.Pass, Steiger.Pass, Coloc.Pass) %>%
+  DT::datatable(rownames = F,
+                caption = "Overview of all results",
+                filter = "top",
+                extensions = c("Buttons"),
+                options = list(dom = "BDfrtip", 
+                               buttons = list('copy',
+                                              list(extend = 'collection', 
+                                                   buttons = c('csv', 'excel'), 
+                                                   text = 'Download')))) %>%
+  DT::formatStyle(
+    "MR.Pass",
+    color = DT::styleEqual(c("Pass", "Fail"),
+                           c("darkgreen", "red")),
+    fontWeight = DT::styleEqual("Pass", "bold")
+  ) %>%
+  DT::formatStyle(
+    "Steiger.Pass",
+    color = DT::styleEqual(c("Pass", "Uncertain", "Fail"),
+                           c("darkgreen", "orange", "red")),
+    fontWeight = DT::styleEqual("Pass", "bold")
+  ) %>%
+  DT::formatStyle(
+    "Coloc.Pass",
+    color = DT::styleEqual(c("Strong", "Moderate", "Weak", "NA"),
+                           c("darkgreen", "orange", "red", "red")),
+    fontWeight = DT::styleEqual("Strong", "bold")
+  )
+```
+
 
 # MR Results
 
@@ -260,7 +324,7 @@ if (length(params$report$plots[params$report$plots$type == "regional", ]) > 0) {
 }
 ```
 
-```{r coloc}
+```{r coloc, echo = F, warning = F}
 cresults <- params$report$cresults
 
 for (i in 1:nrow(cresults)) {

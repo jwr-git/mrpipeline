@@ -1,3 +1,5 @@
+#' Plots F-statistic against P value
+#' UNIMPLEMENTED
 f_plot <- function(dat, report,
                         beta_col = "beta.exposure",
                         se_col = "se.exposure",
@@ -35,6 +37,11 @@ f_plot <- function(dat, report,
   }
 }
 
+#' Creates Z-score plot for SNPs
+#'
+#' @param dat A data.frame of harmonised data
+#'
+#' @return Plot
 interactive_z_plot <- function(dat)
 {
   f <- ggplot2::ggplot(data = dat, aes(x = beta.exposure / se.exposure,
@@ -56,38 +63,81 @@ interactive_z_plot <- function(dat)
   return(f)
 }
 
+#' Plots Volcano plot
+#' UNIMPLEMENTED
 volcano_plot <- function(res, report)
 {
-  if (!nrow(res)) {
+  if (!nrow(res) || !length(res)) {
     return()
   }
 
-  id <- unique(res[["id.exposure"]])
-  name <- unique(res[["exposure"]])
-  res <- res[res$method %in% c("Wald ratio", "Inverse variance weighted"), ]
+  id.exposure <- unique(res[["id.exposure"]])
+  id.outcome <- unique(res[["id.outcome"]])
+  exposure <- unique(res[["exposure"]])
+  outcome <- unique(res[["outcome"]])
 
-  if (is.na(id) || !nrow(res)) {
+  if (is.na(id.exposure) || !nrow(res)) {
     return()
   }
 
-  p <- ggplot2::ggplot(data = res, aes(x = b, y = -log10(pval), label = outcome)) +
-    ggplot2::geom_point(aes(shape = method), size=2) +
+  p <- ggplot2::ggplot(data = res, aes(x = b, y = -log10(p), label = outcome)) +
+    ggplot2::geom_point(aes(text = sprintf("SNP: %s", SNP)), size=2) +
     #ggrepel::geom_label_repel(box.padding=0.35,
     #                 point.padding=0.5,
     #                 size=6,
     #                 segment.colour="grey50") +
     ggplot2::theme_bw() +
-    ggplot2::xlab("Odds ratio") +
+    ggplot2::xlab("ln(Odds ratio)") +
     ggplot2::ylab("-log10(P value)")
 
-  report$add_plot(list(id1 = id,
-                       id2 = NA,
-                       name1 = name,
-                       name2 = "",
+  report$add_plot(list(id1 = id.exposure,
+                       id2 = id.outcome,
+                       name1 = exposure,
+                       name2 = outcome,
                        type = "volcano"),
                   p)
 }
 
+#' Plots and returns an interactive volcano plot
+#'
+#' @param dat A data.frame of harmonised data
+#'
+#' @return Plot
+interactive_volcano_plot <- function(dat)
+{
+  if (!nrow(dat) || !length(dat)) {
+    return()
+  }
+
+  r <- dat %>%
+    TwoSampleMR::mr_singlesnp() %>%
+    TwoSampleMR::generate_odds_ratios() %>%
+    dplyr::filter(!startsWith(getElement(., "SNP"), "All"))
+
+  p <- r %>%
+    plotly::highlight_key(~outcome) %>%
+    plotly::plot_ly(
+      x = ~b, y = ~-log10(p),
+      type = 'scatter',
+      mode = "markers+text",
+      textposition = "top",
+      hovertemplate = paste(
+        "<b>", r$SNP, " : ", r$outcome, "</b><br><br>",
+        "MR Beta = %{x:.2f}<br>",
+        "OR (95% CI) = ", signif(r$or, 3), "(", signif(r$or_lci95, 3), ",", signif(r$or_uci95, 3), ")"
+        )
+    ) %>%
+    plotly::highlight(on = "plotly_click", selectize = TRUE, dynamic = TRUE)
+
+  return(p)
+}
+
+#' Plots a PheWAS-like plot of all exposures against one outcome
+#'
+#' @param res A data.frame of results from MR
+#' @param report QCReport class of results, etc. for reporting
+#'
+#' @return NULL
 phewas_plot <- function(res, report)
 {
   if (!nrow(res)) {
@@ -120,6 +170,14 @@ phewas_plot <- function(res, report)
                   p)
 }
 
+#' Plots a regional plot of the area being tested for colocalisation
+#'
+#' @param dat A data.frame of harmonised data
+#' @param pairs A data.frame of pairwise combined IDs
+#' @param i Location in pairs being tested
+#' @param report QCReport class of results, etc. for reporting
+#'
+#' @return NULL
 regional_plot <- function(dat, pairs, i, report)
 {
   if (require("gassocplot"))
@@ -158,6 +216,8 @@ regional_plot <- function(dat, pairs, i, report)
   }
 }
 
+#' Plots a scatter plot of MR results
+#' UNIMPLEMENTED
 mr_scatter_plot <- function(res, keys, dat, report)
 {
   # Mapping went wrong or no results
@@ -189,6 +249,13 @@ mr_scatter_plot <- function(res, keys, dat, report)
                   p)
 }
 
+#' Plots an interactive scatter plot of SNP-exposure and SNP-outcome effects
+#'
+#' @param dat A data.frame of harmonised data
+#' @param id.exposure Exposure ID
+#' @param id.outcome Outcome ID
+#'
+#' @return Plot
 interactive_scatter_plot <- function(dat, id.exposure, id.outcome)
 {
   # Each unique pair of traits need to be colocalised
@@ -219,6 +286,8 @@ interactive_scatter_plot <- function(dat, id.exposure, id.outcome)
   return(f)
 }
 
+#' Forest plot of MR results
+#' UNIMPLEMENTED
 forest_plot <- function(res, dat, report)
 {
 

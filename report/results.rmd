@@ -31,12 +31,16 @@ plots <- params$report$plots
 plots <- plots[plots$id1 == id.exposure, ]
 
 # raw.plots have the same indices as plots
-# therefore raw.plots can be subsetted the same as plots
-raw.plots <- report$raw.plots
-raw.plots <- raw.plots[as.integer(rownames(plots[plots$id1 == id.exposure, ]))]
+# therefore raw.plots can be subset the same as plots
+if (nrow(plots[plots$id1 == id.exposure, ]) > 0) {
+  raw.plots <- report$raw.plots
+  raw.plots <- raw.plots[as.integer(rownames(plots[plots$id1 == id.exposure, ]))]
+}
 
-# Now the df need re-indexed
-rownames(plots) <- 1:nrow(plots)
+if (nrow(plots)) {
+  # Now the df need re-indexed
+  rownames(plots) <- 1:nrow(plots)
+}
 ```
 
 <style type="text/css">
@@ -63,6 +67,106 @@ rownames(plots) <- 1:nrow(plots)
 </style>
 
 # [Back to Main Page](./../report.html)
+
+# Harmonised SNPs
+
+This table shows the SNPs included in the instrument after harmonisation with the outcome dataset(s).
+
+```{r exp-snps}
+if (length(dat) < 1 || nrow(dat) < 1) {
+  cat("No results generated.")
+} else {
+  sketch = htmltools::withTags(table(
+    class = 'display',
+    thead(
+      tr(
+        th(rowspan = 2, 'SNP'),
+        th(colspan = 7, 'Exposure'),
+        th(colspan = 1, ''),
+        th(colspan = 7, 'Outcome')
+      ),
+      tr(
+        lapply(c('Name', 'Eff', 'Alt', 'EAF', 'Beta', 'SE', 'P', 'F.Stat.',
+                 'Name', 'Eff', 'Alt', 'EAF', 'Beta', 'SE', 'P','Inc.MR'), 
+               th)
+      )
+    )
+  ))
+  
+  dat[dat$id.exposure == params$id.exposure, ] %>%
+    dplyr::select(!tidyselect::any_of(
+      c("remove", 
+       "palindromic", 
+       "ambiguous", 
+       "id.outcome", 
+       "id.exposure", 
+       "originalname.outcome",
+       "outcome.deprecated",
+       "mr_keep.outcome",
+       "data_source.outcome",
+       "proxy.outcome",
+       "target_snp.outcome",
+       "proxy_snp.outcome",
+       "target_a1.outcome",
+       "target_a2.outcome",
+       "proxy_a1.outcome",
+       "proxy_a2.outcome",
+       "trait.exposure",
+       "pve.exposure",
+       "rsid",
+       "id",
+       "data_source.exposure",
+       "action",
+       "ogdb_eid",
+       "ogdb_oid",
+       "chr",
+       "pos",
+       "samplesize.exposure",
+       "samplesize.outcome",
+       "ncase.exposure",
+       "ncontrol.exposure",
+       "pval_origin.exposure",
+       "maf.exposure",
+       "pval",
+       "mr_keep",
+       "chr.exposure",
+       "pos.exposure"
+       ))) %>%
+    dplyr::rename(Eff.e = effect_allele.exposure,
+                  Alt.e = other_allele.exposure,
+                  Eff.o = effect_allele.outcome,
+                  Alt.o = other_allele.outcome,
+                  B.e = beta.exposure,
+                  B.o = beta.outcome,
+                  EAF.e = eaf.exposure,
+                  EAF.o = eaf.outcome,
+                  SE.e = se.exposure,
+                  SE.o = se.outcome,
+                  P.e = pval.exposure,
+                  P.o = pval.outcome,
+                  Exposure = exposure,
+                  Outcome = outcome,
+                  Inc.MR = mr_keep.exposure,
+                  F.Stat = f.stat.exposure) %>%
+    dplyr::relocate(SNP,
+                    Exposure, Eff.e, Alt.e, EAF.e, B.e, SE.e, P.e,
+                    F.Stat,
+                    Outcome, Eff.o, Alt.o, EAF.o, B.o, SE.o, P.o,
+                    Inc.MR) %>%
+    DT::datatable(rownames = F,
+                  container = sketch,
+                  caption = "Details for SNPs which were included in the MR analysis by passing the QC and cleaning stages.",
+                  extensions = c("Buttons"),
+                  options = list(order = list(7, "desc"), 
+                                 dom = "BDfrtip",
+                                 buttons = list('copy',
+                                                list(extend = 'collection', 
+                                                     buttons = c('csv', 'excel'), 
+                                                     text = 'Download')))) %>%
+    DT::formatSignif(columns = c("P.e", "P.o"), digits = 3) %>%
+    DT::formatRound(columns = c("F.Stat"), digits = 0)
+}
+```
 
 # Diagnostic Plots
 
@@ -159,13 +263,17 @@ results %>%
 Plots shown here include scatter and forest plots of results, if they are generated (some may require many SNPs).
 
 ## Volcano Plot {.tabset}
-```{r volcano-plot, echo = F, message = F, warning = F, results = F}
-raw.plots[as.integer(rownames(plots[plots$type == "volcano", ]))]
+```{r volcano-plot, echo = F, warning = F, dpi=300, fig.width=2, fig.height=2}
+#raw.plots[as.integer(rownames(plots[plots$type == "volcano", ]))]
+automrpipeline::interactive_volcano_plot(dat[dat$id.exposure == id.exposure,])
+grid.newpage()
 ```
 
 ## PheWAS-like Plot {.tabset}
 ```{r phewas-plot, echo = F, message = F, warning = F, results = F}
-raw.plots[as.integer(rownames(plots[plots$type == "phewas", ]))]
+if (exists("raw.plot")) {
+  raw.plots[as.integer(rownames(plots[plots$type == "phewas", ]))]
+}
 ```
 <!--
 ```{r scatter-plot2, echo = F, message = F, warning = F, results = "asis"}

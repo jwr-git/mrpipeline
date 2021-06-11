@@ -1,18 +1,26 @@
-# Hello, world!
-#
-# This is an example function named 'hello'
-# which prints 'Hello, world!'.
-#
-# You can learn more about package authoring with RStudio at:
-#
-#   http://r-pkgs.had.co.nz/
-#
-# Some useful keyboard shortcuts for package authoring:
-#
-#   Install Package:           'Ctrl + Shift + B'
-#   Check Package:             'Ctrl + Shift + E'
-#   Test Package:              'Ctrl + Shift + T'
-
+#' Entry point for the pipeline.
+#'
+#' @param ids1 IDs or filenames for summary statistics
+#' @param ids2 IDs or filenames for summary statistics
+#' @param p_cutoff P value cutoff for "tophits" from summary statistics,
+#'                 default: 5e-8
+#' @param f_cutoff F-statistic cutoff for exposure data, default: 10
+#' @param chrompos_query Select SNPs within this region only,
+#'                       format: "chrom:start-end"
+#' @param gene_query Select SNPs nearby this gene only, NOT YET IMPLEMENTED
+#' @param markdown Generate markdown report, default: TRUE
+#' @param out_path Path to save markdown report, defaults to user home directory
+#' @param out_name Name of the analysis given to the markdown report,
+#'                 defaults to time and date
+#' @param nthreads Number of threads for use in multithreaded functions,
+#'                 default: 1
+#' @param bfile Plink 1.x format reference files for use in local clumping,
+#'              etc, default: NULL
+#' @param plink_bin Plink 1.x location, default: NULL
+#' @param ... Other arguments for plotting, NOT YET IMPLEMENTED
+#'
+#' @return list of results for debugging
+#' @export
 mr_pipeline <- function(ids1, ids2,
                         p_cutoff = 5e-8,
                         f_cutoff = 10,
@@ -55,8 +63,7 @@ mr_pipeline <- function(ids1, ids2,
                        plink_bin = plink_bin,
                        nthreads = nthreads)
 
-  #id1 <- annotate_datasets(id1, dat, "exposure")
-  #id2 <- annotate_datasets(id2, dat, "outcome")
+  # Annotate the IDs
   dat <- annotate_data(dat, id1, id2)
 
   # MR analyses
@@ -64,6 +71,9 @@ mr_pipeline <- function(ids1, ids2,
 
   # Colocalisation
   cres <- do_coloc(dat, id1, id2, report)
+
+  # Heterogeneity between instruments
+  #hret <- do_heterogeneity(dat, report)
 
   # Where are we saving the reports?
   if (out_path == "")
@@ -92,32 +102,26 @@ mr_pipeline <- function(ids1, ids2,
     make_results(out_path, out_name, report, dat[dat$id.exposure == id.exposure, ], id.exposure, trait.name)
   }
 
+  # Per-outcome report
   for (id.outcome in id2$info$id)
   {
     trait.name <- id2$info[id2$info$id == id.outcome, ]$trait
     make_outcomes(out_path, out_name, report, dat[dat$id.outcome == id.outcome, ], id.outcome, trait.name)
   }
 
+  # Main report file
   make_report(out_path, out_name, dat, report)
 
   return(list(dat, res, cres, report, id1, id2))
 }
 
-load_ids <- function(ids)
-{
-  # IDs may be local files/filepaths or simply IDs for ieugwasr
-  dat <- dplyr::tibble(id = ids, trait = ids, filename = ids)
-
-  loc <- file.exists(ids)
-  if (any(loc))
-  {
-    dat[loc,]$filename <- file.path(dat[loc,]$filename)
-    dat[loc,]$trait <- tools::file_path_sans_ext(basename(dat[loc,]$filename))
-    dat[loc,]$id <- tools::file_path_sans_ext(basename(dat[loc,]$filename))
-  }
-  return(dat)
-}
-
+#' Annotates the data using given IDs
+#'
+#' @param dat Data.frame of data from vcf files or OpenGWAS DB
+#' @param id1 DatasetsID class of exposure IDs
+#' @param id2 DatasetsID class of outcome IDs
+#'
+#' @return Data.frame of annotated dat
 annotate_data <- function(dat, id1, id2)
 {
   dat$ogdb_eid <- dat$id.exposure
@@ -134,6 +138,9 @@ annotate_data <- function(dat, id1, id2)
   return(dat)
 }
 
-# C:\\Users\\jr18055\\Downloads\\IEU-a-2.vcf.gz
-#retval <- mr_pipeline(c("C:\\Users\\jr18055\\Downloads\\IEU-a-2.vcf.gz", "eqtl-a-ENSG00000000457", "eqtl-a-ENSG00000000460", "eqtl-a-ENSG00000134460", "eqtl-a-ENSG00000114013", "eqtl-a-ENSG00000116815", "eqtl-a-ENSG00000135541", "eqtl-a-ENSG00000164691"), c("ieu-b-18", "ieu-b-2"))
+# Examples
+#retval <- mr_pipeline(c("C:\\Users\\jr18055\\Downloads\\IEU-a-2.vcf.gz", "eqtl-a-ENSG00000000457", "eqtl-a-ENSG00000114013", "eqtl-a-ENSG00000116815", "eqtl-a-ENSG00000135541"), c("ieu-b-18", "ieu-b-2"))
 #retval <- mr_pipeline_(c("C:\\Users\\jr18055\\Downloads\\IEU-a-2.vcf.gz", "ieu-a-1"), c("ieu-b-85", "ieu-a-1082"), nthreads=4)
+
+# Biogen test
+#retval <- mr_pipeline(c("eqtl-a-ENSG00000196296", "eqtl-a-ENSG00000140623", "eqtl-a-ENSG00000067836","eqtl-a-ENSG00000267795", "eqtl-a-ENSG00000061656", "eqtl-a-ENSG00000256762", "eqtl-a-ENSG00000185294", "eqtl-a-ENSG00000120071", "eqtl-a-ENSG00000185829", "eqtl-a-ENSG00000238083", "eqtl-a-ENSG00000228696", "eqtl-a-ENSG00000225190", "eqtl-a-ENSG00000153574", "eqtl-a-ENSG00000203760", "eqtl-a-ENSG00000166037", "eqtl-a-ENSG00000187323", "eqtl-a-ENSG00000101306", "eqtl-a-ENSG00000005059", "eqtl-a-ENSG00000168214"), c("ieu-a-1044", "ieu-a-1045", "ieu-a-1041", "ieu-a-1046", "ieu-a-1047", "ieu-a-1048"))

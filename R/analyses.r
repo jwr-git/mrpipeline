@@ -1,3 +1,77 @@
+#' Calculates F-statistic and related
+#'
+#' @param dat A data.frame of data
+#'
+#' @return List of data.frame and integer
+.calc_f_stat <- function(dat, f_cutoff)
+{
+  full.f.stat = F
+
+  if (any(is.na(dat$eaf.exposure))) {
+    warning("Using approximate F-statistic as some allele frequencies are missing.")
+    full.f.stat = F
+  }
+  else if (any(is.na(dat$samplesize.exposure))) {
+    warning("Using approximate F-statistic as some sample sizes are missing.")
+    full.f.stat = F
+  }
+  else if (length(unique(dat$SNP)) == 1) {
+    full.f.stat = F
+  }
+
+  # PVE / F-statistic
+  if (full.f.stat) {
+    dat$maf.exposure <- ifelse(dat$eaf.exposure < 0.5, dat$eaf.exposure, 1 - dat$eaf.exposure)
+    dat$pve.exposure <- mapply(.calc_pve,
+                               dat$beta.exposure,
+                               dat$maf.exposure,
+                               dat$se.exposure,
+                               dat$samplesize.exposure)
+    # From https://doi.org/10.1093/ije/dyr036
+    dat$f.stat.exposure <- ifelse(dat$pve.exposure == -1, 0,
+                                  ((dat$samplesize.exposure - length(unique(dat$SNP)) - 1) / length(unique(dat$SNP))) * (dat$pve.exposure / (1 - dat$pve.exposure)))
+  } else {
+    warning("Using approximate F-statistic as no allele frequency has been provided.")
+    dat$f.stat.exposure <- dat$beta.exposure ** 2 / dat$se.exposure ** 2
+  }
+
+  rem.f.stat <- nrow(dat[dat$f.stat.exposure < f_cutoff, ])
+  dat <- dat[dat$f.stat.exposure >= f_cutoff & !is.na(dat$f.stat.exposure), ]
+
+  return(list(dat, rem.f.stat))
+}
+
+#' Calculates proportion of variance explained
+#' From https://doi.org/10.1371/journal.pone.0120758 S1 Text
+#'
+#' @param b Vector or number, beta
+#' @param maf Vector or number, minor allele frequency
+#' @param se Vector or number, standard error of beta
+#' @param n Vector or number, sample size
+#'
+#' @return Vector or number, proportion of variance explained
+.calc_pve <- function(b, maf, se, n)
+{
+  tryCatch(
+    expr = {
+      pve <- (2 * (b^2) * maf * (1 - maf)) /
+        ((2 * (b^2) * maf * (1 - maf)) + ((se^2) * 2 * n * maf * (1 - maf)))
+    },
+    error = function(x) {
+      pve <- -1
+    }
+  )
+  return(pve)
+}
+
+#' Runs Mendelian randomisation and related analyses, including heterogeneity,
+#' Steiger filtering and pleiotropy analyses.
+#' Also generates a number of plots, e.g. volcano plots, for MR results.
+#'
+#' @param dat A data.frame of harmonised data
+#' @param report QCReport class of results, etc. for reporting
+#'
+#' @return A data.frame of MR results
 do_mr <- function(dat, report)
 {
   res <- dat[dat$mr_keep.exposure == T,] %>%
@@ -8,8 +82,10 @@ do_mr <- function(dat, report)
   #  dplyr::group_by(id.exposure, id.outcome) %>%
   #  dplyr::group_map(~ mr_scatter_plot(.x, .y, dat, report), .keep = T)
 
-  # Volcano plot of MR results
-  res %>%
+  # Volcano plot of each SNPs' WR results
+  TwoSampleMR::mr_singlesnp(dat) %>%
+    TwoSampleMR::generate_odds_ratios() %>%
+    dplyr::filter(!startsWith(getElement(., "SNP"), "All")) %>%
     dplyr::group_by(id.exposure) %>%
     dplyr::group_map(~ volcano_plot(.x, report), .keep = T)
 
@@ -18,6 +94,7 @@ do_mr <- function(dat, report)
     dplyr::group_by(id.exposure) %>%
     dplyr::group_map(~ phewas_plot(.x, report), .keep = T)
 
+  # Report results separately
   main <- res[res$method %in% c("Wald ratio", "Inverse variance weighted"),]
   sensitivity <- res[!(res$method %in% c("Wald ratio", "Inverse variance weighted")),]
 
@@ -51,6 +128,18 @@ do_mr <- function(dat, report)
   return(res)
 }
 
+#' Runs colocalisation using the coloc R package's coloc.abf function
+#'
+#' @param dat A data.frame of harmonised data
+#' @param id1 DatasetsID class of exposure IDs
+#' @param id2 DatasetsID class of outcome IDs
+#' @param report QCReport class of results, etc. for reporting
+#' @param window Region to extract SNPs from, either side of lead SNP,
+#'               default: 400kb
+#' @param chrpos Chromosome position to search for SNPs, default uses region
+#'               around lead SNP but can be overwritten if provided
+#' @param nthreads Number of threads for use in multithreaded functions,
+#'                 default: 1
 do_coloc <- function(dat, id1, id2, report,
                      window = 400, # Kb
                      chrpos = "",
@@ -63,6 +152,10 @@ do_coloc <- function(dat, id1, id2, report,
   {
     subdat <- dat[dat$id.exposure == pairs[i, "id.x"] & dat$id.outcome == pairs[i, "id.y"],]
 
+    if (length(subdat) < 1 || nrow(subdat) < 1) {
+      return(NULL)
+    }
+
     # Select region for which to do coloc
     # atm very simply the lowest P-value region
     if (chrpos == "")
@@ -74,13 +167,13 @@ do_coloc <- function(dat, id1, id2, report,
     f1 <- pairs[i, "filename.x"]
     f2 <- pairs[i, "filename.y"]
 
-    if (file.exists(f1) && file.exists(f2))
+    if (file.exists(f1) & file.exists(f2))
     {
       cdat <- gwasglue::gwasvcf_to_coloc(f1, f2, chrpos)
       regional_plot(cdat, pairs, i, report)
 
       return(coloc_sub(cdat[[1]], cdat[[2]], pairs, i, chrpos, report))
-    } else if (!file.exists(f1) && !file.exists(f2))
+    } else if (!file.exists(f1) & !file.exists(f2))
     {
       cdat <- gwasglue::ieugwasr_to_coloc(pairs[i, "id.x"], pairs[i, "id.y"], chrpos)
       regional_plot(cdat, pairs, i, report)
@@ -94,6 +187,17 @@ do_coloc <- function(dat, id1, id2, report,
   return(cres)
 }
 
+#' Sub-function for the colocalisation analyses
+#'
+#' @param dat1 SNPs, etc. from first dataset
+#' @param dat2 SNPs, etc. from second dataset
+#' @param pairs A data.frame of pairwise combined IDs
+#' @param i Location in pairs being colocalised
+#' @param chrpos Chromosome position to search for SNPs, default uses region
+#'               around lead SNP but can be overwritten if provided
+#' @param report QCReport class of results, etc. for reporting
+#'
+#' @return Results, or empty if cannot run the colocalisation
 coloc_sub <- function(dat1, dat2, pairs, i, chrpos, report)
 {
   if (!length(dat1) || !length(dat2))
@@ -158,8 +262,37 @@ coloc_sub <- function(dat1, dat2, pairs, i, chrpos, report)
   return(cres)
 }
 
-do_heterogeneity <- function(res, report)
+#' Sub-function to run heterogeneity analyses
+#' UNIMPLEMENTED
+do_heterogeneity <- function(dat, report)
 {
+  single <- TwoSampleMR::mr_singlesnp(dat)
+
+  for (exposure in single$exposure)
+  {
+    sres <- single[single$exposure == exposure, ]
+    sres <- sres[!startsWith(sres$SNP, "All"), ] # Exclude all analyses
+
+    if (length(sres) == 0 | nrow(sres) < 2)
+    {
+      report$add_hresults(list(id.exposure = sres$id.exposure[1],
+                               id.outcome = sres$id.outcome[1],
+                               exposure = sres$exposure[1],
+                               outcome = sres$outcome[1],
+                               method = "",
+                               Q = 0,
+                               Q_df = 0,
+                               Q_pval = 0))
+      next
+    }
+
+    # Multiplicative random effects
+    res <- summary(lm(b_out ~ -1 + b_exp, weights = 1/se_out^2))
+    Q_df = length(b_exp) - 1
+    Q = res$sigma^2 * Q_df
+    Q_pval = pchisq(Q, Q_df, low=FALSE)
+  }
+
   #res_nosens <- res[res$method %in% c("Wald ratio", "Inverse variance weighted"), ]
 
   # Heterogeneity if more than 1 SNP
