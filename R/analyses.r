@@ -64,6 +64,35 @@
   return(pve)
 }
 
+#' Calculates the second term Taylor approximation for standard error of
+#' the Wald ratio method.
+#' From https://doi.org/10.1101/2021.03.01.433439 supplementary
+#'
+#' @param object Data.frame or vector
+#'
+#' @return Appended result
+.wr_taylor_approx <- function(dat)
+{
+  b <- dat$beta.outcome / dat$beta.exposure
+  se <- (dat$se.outcome ** 2 / dat$beta.exposure ** 2) + ((dat$beta.outcome ** 2 * dat$se.exposure ** 2) / (dat$beta.exposure ** 4))
+  se <- sqrt(se)
+  pval <- pnorm(abs(b) / se, lower.tail = F) * 2
+
+  res <- data.frame(
+    id.exposure = dat$id.exposure[1],
+    id.outcome = dat$id.outcome[1],
+    outcome = dat$outcome[1],
+    exposure = dat$exposure[1],
+    method = "Wald ratio",
+    nsnp = 1,
+    b = b,
+    se = se,
+    pval = pval
+  )
+
+  return(res)
+}
+
 #' Runs Mendelian randomisation and related analyses, including heterogeneity,
 #' Steiger filtering and pleiotropy analyses.
 #' Also generates a number of plots, e.g. volcano plots, for MR results.
@@ -74,8 +103,19 @@
 #' @return A data.frame of MR results
 do_mr <- function(dat, report)
 {
-  res <- dat[dat$mr_keep.exposure == T,] %>%
-    TwoSampleMR::mr() %>%
+  res <- plyr::ddply(dat, c("id.exposure", "id.outcome"), function(x1)
+  {
+    x <- subset(x1, mr_keep.exposure)
+
+    if (nrow(x) == 1) {
+      res <- .wr_taylor_approx(x)
+    }
+    else {
+      res <- TwoSampleMR::mr(x)
+    }
+
+    res <- subset(res, !(is.na(b) & is.na(se) & is.na(pval)))
+  }) %>%
     TwoSampleMR::generate_odds_ratios()
 
   #res %>%
