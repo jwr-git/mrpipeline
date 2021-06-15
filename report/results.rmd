@@ -70,7 +70,7 @@ if (nrow(plots)) {
 
 # Harmonised SNPs
 
-This table shows the SNPs included in the instrument after harmonisation with the outcome dataset(s).
+This table shows the SNPs included in the instrument after [harmonisation](https://mr-dictionary.mrcieu.ac.uk/term/harmonization/) with the outcome dataset(s).
 
 ```{r exp-snps}
 if (length(dat) < 1 || nrow(dat) < 1) {
@@ -213,7 +213,7 @@ for (i in unique(dat$id.outcome)) {
 -->
 # MR Results
 
-Results for the main MR analyses (Wald ratio (WR) and inverse variance weighted (IVW)) are given here. The WR method is performed on single-SNP instruments, whilst the IVW method is performed on everything else.
+Results for the main MR analyses ([Wald ratio]((https://mr-dictionary.mrcieu.ac.uk/term/wald-ratio/)) (WR) and [inverse variance weighted]((https://mr-dictionary.mrcieu.ac.uk/term/ivw/)) (IVW)) are given here. The WR method is performed on single-SNP instruments, whilst the IVW method is performed on everything else.
 
 ```{r results-mr, message = F, warning = F, echo = F}
 steiger <- params$report$steigerresults
@@ -296,7 +296,7 @@ if (!nrow(plots[plots$type == "scatter", ]) || all(is.na(plots[plots$type == "sc
 
 # Colocalisation
 
-Colocalisaton uses the coloc.abf function from the coloc R package. This section should be expanded to include conditional analyses and/or pwcoco, or other colocalisation methods.
+[Colocalisaton]((https://mr-dictionary.mrcieu.ac.uk/term/colocalization/)) uses the coloc.abf function from the [coloc R package](https://cran.r-project.org/web/packages/coloc/vignettes/vignette.html). This section should be expanded to include conditional analyses and/or pwcoco, or other colocalisation methods.
 
 `r if (!length(cresults) || nrow(cresults) < 1 || !length(cresults[cresults["nsnps"] > 50, ])) { "\\begin{comment}" }`
 

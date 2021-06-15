@@ -42,7 +42,7 @@ knitr::opts_chunk$set(echo = F)
 
 This page contains an overview for the analyses that have been carried out. Links are provided to each per-trait specific analysis in the dataset tables. All tables and figures are downloadable and all separate report pages are self-contained html files, meaning these can be sent to other people without extra files.
 
-Details and explanations of analyses and results are given throughout.
+Details and explanations of analyses and results are given throughout. Certain terms related to MR are hyperlinked to the MR Dictionary, which offers an explanation for that term.
 
 # Overview of Datasets
 
@@ -75,9 +75,9 @@ params$report$exposures %>%
   <li><code>Trait.Annotated</code>: Name of the trait - Links to that trait's results report.</li>
   <li><code>Trait.ID</code>: Trait ID - Links to the OpenGWAS DB, if applicable.</li>
   <li><code>SNPs</code>: Number of SNPs initially loaded from the GWAS (either from the file or from the OpenGWAS database).</li>
-  <li><code>Preclumped</code>: Whether or not the dataset was already clumped (e.g., data from OpenGWAS can be retrieved after undergoing clumping with the standard parameters).</li>
-  <li><code>Rem.F.Stat</code>: Number of SNPs which were removed due to not meeting the F-statistic cut-off.</li>
-  <li><code>Rem.Clumped</code>: Number of SNPs which were removed due to clumping. Note that this will be 0 if the data was pre-clumped.</li>
+  <li><code>Preclumped</code>: Whether or not the dataset was already [clumped](https://mr-dictionary.mrcieu.ac.uk/term/ld/) (e.g., data from OpenGWAS can be retrieved after undergoing clumping with the standard parameters).</li>
+  <li><code>Rem.F.Stat</code>: Number of SNPs which were removed due to not meeting the [F-statistic](https://mr-dictionary.mrcieu.ac.uk/term/weak-instrument/) cut-off.</li>
+  <li><code>Rem.Clumped</code>: Number of SNPs which were removed due to [clumping](https://mr-dictionary.mrcieu.ac.uk/term/ld/). Note that this will be 0 if the data was pre-clumped.</li>
   <li><code>SNPs.Formatted</code>: Number of SNPs which were successfully formatted to the MR-Base/TwoSampleMR package format (e.g., SNPs which had negative standard errors are removed at this stage).</li>
 </ul>
 
@@ -260,7 +260,7 @@ dplyr::left_join(mrres, steigerres, by = c("id.exposure", "id.outcome")) %>%
 
 # MR Results
 
-MR results are presented here for the Wald ratio (WR) and inverse variance weighted (IVW). The per-trait reports detail further MR methods, such as MR-Egger, but are omitted here for brevity.
+MR results are presented here for the [Wald ratio](https://mr-dictionary.mrcieu.ac.uk/term/wald-ratio/) (WR) and [inverse variance weighted](https://mr-dictionary.mrcieu.ac.uk/term/ivw/) (IVW). The per-trait reports detail further MR methods, such as [MR-Egger](https://mr-dictionary.mrcieu.ac.uk/term/mr-egger/), but are omitted here for brevity.
 
 There were a total of `r 0.05 / params$report$bonferroni` MR tests conducted. A Bonferroni P-value threshold would therefore be `r params$report$bonferroni` ($0.05 / tests$).
 
@@ -298,18 +298,18 @@ params$report$results %>%
 <ul>
   <li><code>Exposure</code>: Exposure trait names.</li>
   <li><code>Outcome</code>: Outcome trait names.</li>
-  <li><code>Method</code>: MR method, either WR for single-SNP instruments or IVW for multi-SNP instruments.</li>
+  <li><code>Method</code>: MR method, either [WR](https://mr-dictionary.mrcieu.ac.uk/term/wald-ratio/) for single-SNP instruments or [IVW](https://mr-dictionary.mrcieu.ac.uk/term/ivw/) for multi-SNP instruments.</li>
   <li><code>SNPs</code>: Number of SNPs that form the instrument.</li>
   <li><code>P.value</code>: MR P value.</li>
   <li><code>OR</code>: MR odds ratios.</li>
   <li><code>Lower.95ci</code>: Lower 95% confidence interval.</li>
   <li><code>Upper.95ci</code>: Upper 95% confidence interval.</li>
-  <li><code>Steiger.Flag</code>: Flag for the Steiger filtering results: true, direction of effect is from exposure to the outcome; false, the direction of effect is from outcome to the exposure; unknown, Steiger P value is > 0.05.</li>
+  <li><code>Steiger.Flag</code>: Flag for the [Steiger filtering](https://mr-dictionary.mrcieu.ac.uk/term/steiger/) results: true, direction of effect is from exposure to the outcome; false, the direction of effect is from outcome to the exposure; unknown, Steiger P value is > 0.05.</li>
 </ul>
 
 # Colocalisation Results
 
-Here are all of the colocalisation results. Regional plots are available in the per-trait reports.
+Here are all of the [colocalisation](https://mr-dictionary.mrcieu.ac.uk/term/colocalization/) results. Regional plots are available in the per-trait reports.
 
 ```{r regional-plot, echo = F, message = F, include = F, dev = 'png', fig.show = 'hide'}
 if (length(params$report$plots[params$report$plots$type == "regional", ]) > 0) {
@@ -368,5 +368,5 @@ if (length(cresults)) {
   <li><code>Plot</code>: Hover over for the regional plot.</li>
   <li><code>SNPs</code>: Number of SNPs that form the instrument.</li>
   <li><code>H0-4</code>: Posterior probability for hypotheses 0 through 4.</li>
-  <li><code>ChrPos</code>: Chromosome and position range used to extract SNPs for colocalisation.</li>
+  <li><code>ChrPos</code>: Chromosome and position range used to extract SNPs for [colocalisation](https://mr-dictionary.mrcieu.ac.uk/term/colocalization/).</li>
 </ul>
