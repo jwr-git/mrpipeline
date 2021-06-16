@@ -1,12 +1,16 @@
-Package: automrpipeline
+Package: mrpipeline
 Type: Package
-Title: What the Package Does (Title Case)
+Title: Implements a Ready-for-Use Mendelian Randomisation Pipeline
 Version: 0.1.0
-Author: Who wrote it
-Maintainer: The package maintainer <yourself@somewhere.net>
-Description: More about what it does (maybe more than one line)
-    Use four spaces when indenting paragraphs within the Description.
+Author: Jamie Robinson
+Maintainer: Jamie Robinson <jamie.robinson@biogen.com>
+Description: This package implements a pipeline which in turns allows for simple
+    and generally "hands-free" Mendelian randomisation analyses to be run. Data
+    may be used from the OpenGWAS DB or locally, using .vcf files. Analyses
+    include MR, colocalisation and standard MR sensitivity analyses. Please see
+    the documentation for more details.
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
 Imports: TwoSampleMR, ieugwasr, gwasglue, gwasvcf, tools, dplyr, ggplot2, gassocplot, grid, ggrepel, plotly
+RoxygenNote: 7.1.1

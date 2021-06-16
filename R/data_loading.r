@@ -343,7 +343,7 @@ DatasetIDs <- setRefClass("DatasetIDs",
     warning("biomaRt is currently unavailable and so ENSG IDs will not be annotated.")
   })
 
-  if (!exists("mart.gene")) {
+  if (is.na(mart.gene) | !exists("mart.gene")) {
     return(NULL)
   }
 
