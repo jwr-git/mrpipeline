@@ -120,14 +120,14 @@ QCReport <- setRefClass("QCReport",
 
                           add_dataset = function(name, x) {
                             "Add dataset to either exposure/outcome data.frame"
-                            temp <- get(name)
+                            temp <- base::get(name)
                             temp[nrow(temp) + 1, ] <- c(x, rep(0, ncol(temp) - length(x)))
                             assign(name, temp, inherits = T)
                           },
 
                           update_cell = function(name, trait, col, val) {
                             "Update cell of exposure/outcome data.frame"
-                            temp <- get(name)
+                            temp <- base::get(name)
                             temp[temp$Trait.Name == trait, col] <- val
                             assign(name, temp, inherits = T)
                           },
@@ -146,7 +146,7 @@ QCReport <- setRefClass("QCReport",
 
                           add_sresults = function(name, x) {
                             "Adds sensitivity MR results to data.frame"
-                            temp <- get(name)
+                            temp <- base::get(name)
                             temp <- rbind(temp, x)
                             assign(name, temp, inherits = T)
                           },

@@ -1,0 +1,98 @@
+# These are the defaul parameters the pipeline will use
+# when running. You may either specify your own paramters
+# within this file, following the same structure but with
+# a different name, or you may use your own file.
+#
+# If a parameter cannot be read from the config profile
+# then the default option will be used instead.
+#
+# Note that R code can be used by prefacing the parameter
+# with "!expr". This will be evaluated when the parameter
+# is read by the pipeline.
+#
+# For more information, please see ...
+default:
+  # Directory to save output. By default this will save
+  # to the users HOME directory
+  out_path: !expr Sys.getenv("HOME")
+  
+  # Name of the report. By default this will be the time
+  # the pipeline was run. This can also be defined upon
+  # calling the "mr_pipeline" function as an argument
+  out_name: !expr format(Sys.time(), "%Y-%m-%d-%s")
+  
+  # Number of cores to use for some multi-threaded
+  # data reading and analysis.
+  cores: !expr getOption("mc.cores")
+  
+  # P value cutoff for SNPs to be considered "significant"
+  p_cutoff: 5.0e-8
+  
+  # F-statistic cutoff to prevent "weak instrument bias"
+  f_cutoff: 10
+  
+  # Clumping r2 threshold for removal of SNPs in LD
+  clump_r2: 0.001
+  
+  # Clumping range for SNPs to be considered potentially
+  # in LD with each other
+  clump_kb: 10000
+  
+  # Clumping mega-population to use
+  pop: "EUR"
+  
+  # Whether or not to search for proxy SNPs in the outcome
+  # dataset
+  proxies: true
+  
+  # Which action to take for harmonisation:
+  # 1. assume all alleles are coded on forward strand
+  # 2. try to infer positive strand
+  # 3. correct strand for non-palindromic SNPs, and drop
+  #    those which are palindromic
+  # See: https://rdrr.io/github/MRCIEU/TwoSampleMR/man/harmonise_data.html
+  harmonise_action: 1
+  
+  # Path to Plink-formatted reference files. If "NULL"
+  # then all clumping will take place using the MR-Base
+  # server, remotely
+  bfile_path: ~
+  
+  # Path to Plink bin. If "NULL" then all clumping will
+  # take place on the MR-Base remote server
+  plink_path: ~
+  
+  # Whether to use the second-term Taylor approximation of the SE
+  # for the Wald ratio method or not.
+  # See https://doi.org/10.1101/2021.03.01.433439 supplementary
+  wr_taylor_approx: true
+  
+  # Should a Bonferroni-correct P value threshold be used
+  # for the MR results? Will be constructed dynamically
+  # from the amount of results generated.
+  bonferroni_mr_p_thres: true
+  
+  # Use a custom set P value threshold. If the above
+  # setting is "true" then this setting will be ignored
+  mr_p_thres: 0.05
+  
+  # Regional window size to extract for colocalisation.
+  # This is +/- from the lead SNP and given in Kb.
+  coloc_window: 400
+  
+  # Minimum number of SNPs required for the colocalisation
+  # analyses. Advised not to go too low otherwise the 
+  # analysis will not make sense.
+  coloc_min_snps: 50
+  
+  # Prior probability a SNP is associated with trait 1
+  # in the colocalisation analyses
+  coloc_p1: 1.0e-4
+  
+  # Prior probability a SNP is associated with trait 2
+  # in the colocalisation analyses
+  coloc_p2: 1.0e-4
+  
+  # Prior probability a SNP is associated with both traits
+  # in the colocalisation analyses
+  coloc_p12: 1.0e-5

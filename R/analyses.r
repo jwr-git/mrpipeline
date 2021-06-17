@@ -5,18 +5,18 @@
 #' @return List of data.frame and integer
 .calc_f_stat <- function(dat, f_cutoff)
 {
-  full.f.stat = F
+  full.f.stat <- T
 
   if (any(is.na(dat$eaf.exposure))) {
     warning("Using approximate F-statistic as some allele frequencies are missing.")
-    full.f.stat = F
+    full.f.stat <- F
   }
   else if (any(is.na(dat$samplesize.exposure))) {
     warning("Using approximate F-statistic as some sample sizes are missing.")
-    full.f.stat = F
+    full.f.stat <- F
   }
   else if (length(unique(dat$SNP)) == 1) {
-    full.f.stat = F
+    full.f.stat <- F
   }
 
   # PVE / F-statistic
@@ -31,7 +31,7 @@
     dat$f.stat.exposure <- ifelse(dat$pve.exposure == -1, 0,
                                   ((dat$samplesize.exposure - length(unique(dat$SNP)) - 1) / length(unique(dat$SNP))) * (dat$pve.exposure / (1 - dat$pve.exposure)))
   } else {
-    warning("Using approximate F-statistic as no allele frequency has been provided.")
+    message("Using approximate F-statistic as no allele frequency has been provided.")
     dat$f.stat.exposure <- dat$beta.exposure ** 2 / dat$se.exposure ** 2
   }
 
@@ -99,15 +99,16 @@
 #'
 #' @param dat A data.frame of harmonised data
 #' @param report QCReport class of results, etc. for reporting
+#' @param conf config::config file of parameter
 #'
 #' @return A data.frame of MR results
-do_mr <- function(dat, report)
+do_mr <- function(dat, report, conf)
 {
   res <- plyr::ddply(dat, c("id.exposure", "id.outcome"), function(x1)
   {
     x <- subset(x1, mr_keep.exposure)
 
-    if (nrow(x) == 1) {
+    if (nrow(x) == 1 & conf$wr_taylor_approx == T) {
       res <- .wr_taylor_approx(x)
     }
     else {
@@ -174,16 +175,10 @@ do_mr <- function(dat, report)
 #' @param id1 DatasetsID class of exposure IDs
 #' @param id2 DatasetsID class of outcome IDs
 #' @param report QCReport class of results, etc. for reporting
-#' @param window Region to extract SNPs from, either side of lead SNP,
-#'               default: 400kb
-#' @param chrpos Chromosome position to search for SNPs, default uses region
-#'               around lead SNP but can be overwritten if provided
-#' @param nthreads Number of threads for use in multithreaded functions,
-#'                 default: 1
-do_coloc <- function(dat, id1, id2, report,
-                     window = 400, # Kb
-                     chrpos = "",
-                     nthreads = 1)
+#' @param conf config::config file of parameter
+#'
+#' @return A data.frame of colocalistion results
+do_coloc <- function(dat, id1, id2, report, conf)
 {
   # Each unique pair of traits need to be colocalised
   pairs <- .combine_ids(id1, id2)
@@ -198,11 +193,12 @@ do_coloc <- function(dat, id1, id2, report,
 
     # Select region for which to do coloc
     # atm very simply the lowest P-value region
-    if (chrpos == "")
-    {
-      idx <- which.min(subdat$pval.exposure)
-      chrpos <- paste0(subdat$chr[idx], ":", max(as.numeric(subdat$pos[idx]) - window * 100, 0), "-", as.numeric(subdat$pos[idx]) + window * 100)
-    }
+    idx <- which.min(subdat$pval.exposure)
+    chrpos <- paste0(subdat$chr[idx],
+                     ":",
+                     max(as.numeric(subdat$pos[idx]) - conf$coloc_window * 100, 0),
+                     "-",
+                     as.numeric(subdat$pos[idx]) + conf$coloc_window * 100)
 
     f1 <- pairs[i, "filename.x"]
     f2 <- pairs[i, "filename.y"]
@@ -212,18 +208,18 @@ do_coloc <- function(dat, id1, id2, report,
       cdat <- gwasglue::gwasvcf_to_coloc(f1, f2, chrpos)
       regional_plot(cdat, pairs, i, report)
 
-      return(coloc_sub(cdat[[1]], cdat[[2]], pairs, i, chrpos, report))
+      return(coloc_sub(cdat[[1]], cdat[[2]], pairs, i, chrpos, report, conf))
     } else if (!file.exists(f1) & !file.exists(f2))
     {
       cdat <- gwasglue::ieugwasr_to_coloc(pairs[i, "id.x"], pairs[i, "id.y"], chrpos)
       regional_plot(cdat, pairs, i, report)
 
-      return(coloc_sub(cdat[[1]], cdat[[2]], pairs, i, chrpos, report))
+      return(coloc_sub(cdat[[1]], cdat[[2]], pairs, i, chrpos, report, conf))
     } else {
       # One is file, one is not
       ## TODO me :(
     }
-  }, mc.cores = nthreads)
+  }, mc.cores = conf$cores)
   return(cres)
 }
 
@@ -236,9 +232,10 @@ do_coloc <- function(dat, id1, id2, report,
 #' @param chrpos Chromosome position to search for SNPs, default uses region
 #'               around lead SNP but can be overwritten if provided
 #' @param report QCReport class of results, etc. for reporting
+#' @param conf config::config file of parameter
 #'
 #' @return Results, or empty if cannot run the colocalisation
-coloc_sub <- function(dat1, dat2, pairs, i, chrpos, report)
+coloc_sub <- function(dat1, dat2, pairs, i, chrpos, report, conf)
 {
   if (!length(dat1) || !length(dat2))
   {
@@ -268,7 +265,7 @@ coloc_sub <- function(dat1, dat2, pairs, i, chrpos, report)
   # best to ignore this coloc
   # TODO - better way of dealing with this?
   if (any(is.na(dat1$MAF)) || any(is.na(dat2$MAF)) ||
-      length(dat1$snp) < 50 || length(dat2$snp) < 50)
+      length(dat1$snp) < conf$coloc_min_snps || length(dat2$snp) < conf$coloc_min_snps)
   {
     report$add_cresults(list(id1 = pairs[i, "id.x"],
                              id2 = pairs[i, "id.y"],
@@ -285,7 +282,10 @@ coloc_sub <- function(dat1, dat2, pairs, i, chrpos, report)
     return()
   }
 
-  cres <- coloc::coloc.abf(dat1, dat2)
+  cres <- coloc::coloc.abf(dat1, dat2,
+                           p1 = conf$coloc_p1,
+                           p2 = conf$coloc_p2,
+                           p12 = conf$coloc_p12)
 
   report$add_cresults(list(id1 = pairs[i, "id.x"],
                            id2 = pairs[i, "id.y"],

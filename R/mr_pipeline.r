@@ -2,43 +2,41 @@
 #'
 #' @param ids1 IDs or filenames for summary statistics
 #' @param ids2 IDs or filenames for summary statistics
-#' @param p_cutoff P value cutoff for "tophits" from summary statistics,
-#'                 default: 5e-8
-#' @param f_cutoff F-statistic cutoff for exposure data, default: 10
-#' @param chrompos_query Select SNPs within this region only,
-#'                       format: "chrom:start-end"
-#' @param gene_query Select SNPs nearby this gene only, NOT YET IMPLEMENTED
-#' @param markdown Generate markdown report, default: TRUE
-#' @param out_path Path to save markdown report, defaults to user home directory
 #' @param out_name Name of the analysis given to the markdown report,
 #'                 defaults to time and date
-#' @param nthreads Number of threads for use in multithreaded functions,
-#'                 default: 1
-#' @param bfile Plink 1.x format reference files for use in local clumping,
-#'              etc, default: NULL
-#' @param plink_bin Plink 1.x location, default: NULL
+#' @param config_file Path to config.yml file. Defaults to file that comes with the
+#'                    package. Please see that file for more details.
 #' @param ... Other arguments for plotting, NOT YET IMPLEMENTED
 #'
 #' @return list of results for debugging
 #' @export
 mr_pipeline <- function(ids1, ids2,
-                        p_cutoff = 5e-8,
-                        f_cutoff = 10,
-                        chrompos_query = NULL,
-                        gene_query = NULL,
-                        markdown = T,
-                        out_path = "",
                         out_name = "",
-                        nthreads = 1,
-                        bfile = NULL,
-                        plink_bin = NULL,
+                        config_file = "",
                         ...)
 {
-  if (is.null(p_cutoff) && is.null(chrompos_query) && is.null(gene_query))
-  {
-    stop("One of the following must be provided: a P value cutoff, a chromosome/position lookup, or a gene lookup. ",
-         "Chromosome/positions and genes can be given as a data.frame for multiple lookups.")
+  # Config file loading
+  if (config_file != "") {
+    # Attempt to load config from given path
+    conf <- try(config::get(file = config_file), silent = T)
   }
+
+  if (exists("conf") == F) {
+    message("Using default config file.")
+    conf <- try(config::get(system.file("config", "config.yml", package = "mrpipeline")), silent = T)
+  }
+
+  if (class(conf) == "try-error" | exists("conf") == F) {
+    stop("No config file found -- has the default been moved or deleted?")
+  }
+
+  conf <- validate_config(conf)
+
+  #if (is.null(p_cutoff) && is.null(chrompos_query) && is.null(gene_query))
+  #{
+  #  stop("One of the following must be provided: a P value cutoff, a chromosome/position lookup, or a gene lookup. ",
+  #       "Chromosome/positions and genes can be given as a data.frame for multiple lookups.")
+  #}
 
   # Set up report class containing meta-data
   report <- QCReport$new()
@@ -57,39 +55,26 @@ mr_pipeline <- function(ids1, ids2,
   # Read datasets, format and harmonise in TwoSampleMR format
   dat <- read_datasets(id1, id2,
                        report,
-                       p_cutoff, chrompos_query, gene_query,
-                       f_cutoff = f_cutoff,
-                       bfile = bfile,
-                       plink_bin = plink_bin,
-                       nthreads = nthreads)
+                       conf)
 
   # Annotate the IDs
   dat <- annotate_data(dat, id1, id2)
 
   # MR analyses
-  res <- do_mr(dat, report)
+  res <- do_mr(dat, report, conf)
 
   # Colocalisation
-  cres <- do_coloc(dat, id1, id2, report)
+  cres <- do_coloc(dat, id1, id2, report, conf)
 
   # Heterogeneity between instruments
   #hret <- do_heterogeneity(dat, report)
 
   # Where are we saving the reports?
-  if (out_path == "")
-  {
-    out_path <- Sys.getenv("HOME")
-    if (file.access(out_path))
-    {
-      stop(paste0("No output path given and invalid permissions for User's Home directory: ", out_path, "."),
-           "Please supply an output path using the `out_path_ argument.")
-    }
-    message(paste0("No output path given, therefore defaulting to User's Home directory: ", out_path, "."))
-  }
+  out_path <- conf$out_path
 
   if (out_name == "" || dir.exists(paste0(out_path, "\\", out_name)))
   {
-    out_name <- format(Sys.time(), "%Y-%m-%d-%s")
+    out_name <- conf$out_name
     message("No output name given or already exists; defaulting to: ", out_name)
   }
   dir.create(file.path(out_path, out_name))
@@ -136,6 +121,46 @@ annotate_data <- function(dat, id1, id2)
     select(-filename, -trait)
 
   return(dat)
+}
+
+#' Validates parameters in config file
+#'
+#' @param conf config::config file of parameters
+#'
+#' @return Validated config class
+validate_config <- function(conf)
+{
+  if (file.access(conf$out_path)) {
+    stop(paste0("Cannot access output path given or invalid permissions directory: ", conf$out_path, "."))
+  }
+
+  if (class(conf$cores) != "numeric") {
+    warning("Cores parameter is not numeric or not set in environment; defaulting to 1.")
+    conf$cores <- 1
+  }
+
+  if (conf$pop != "EUR" & conf$pop != "SAS" & conf$pop != "EAS" & conf$pop != "AFR" & conf$pop != "AMR") {
+    warning("Invalid population given, valid options are: EUR, SAS, EAS, AFR, AMR. Defaulting to EUR.")
+    conf$pop <- "EUR"
+  }
+
+  if (!is.null(conf$bfile_path)) {
+    if (file.exists(paste0(conf$bfile_path), ".bim")) {
+      warning("Cannot access Plink files at: ", conf$bfile_path, ". Did you include the file endings? Defaulting to NULL.")
+      conf$bfile_path <- NULL
+      conf$plink_path <- NULL
+    }
+  }
+
+  if (!is.null(conf$plink_path)) {
+    if (file.exists(paste0(conf$plink_path))) {
+      warning("Cannot access Plink at: ", conf$plink_path, ". Defaulting to NULL.")
+      conf$bfile_path <- NULL
+      conf$plink_path <- NULL
+    }
+  }
+
+  return(conf)
 }
 
 # Examples

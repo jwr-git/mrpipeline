@@ -4,33 +4,12 @@
 #' @param id1 DatasetsID class of exposure IDs
 #' @param id2 DatasetsID class of outcome IDs
 #' @param report QCReport class of results, etc. for reporting
-#' @param p_cutoff P value cutoff for "tophits" from summary statistics
-#' @param chrompos_query Select SNPs within this region only,
-#'                       format: "chrom:start-end"
-#' @param gene_query Select SNPs nearby this gene only, NOT YET IMPLEMENTED
-#' @param f_cutoff F-statistic cutoff for exposure data, default: 10
-#' @param r2 Clumping threshold, default: 0.001
-#' @param kb Clumping window, default: 10000
-#' @param pop Super-population for clumping, default: EUR
-#' @param proxies Whether to search for and use proxy SNPs in the outcome
-#'                dataset, default: TRUE
-#' @param action See: TwoSampleMR::harmonise_data, default: 1
-#' @param bfile Plink 1.x format reference files for use in local clumping,
-#'              etc, default: NULL
-#' @param plink_bin Plink 1.x location, default: NULL
-#' @param nthreads Number of threads for use in multithreaded functions,
-#'                 default: 1
+#' @param conf config::config file of parameters
 #'
 #' @return Data.frame of harmonised exposure-outcome SNPs
 read_datasets <- function(id1, id2,
                           report,
-                          p_cutoff, chrompos_query, gene_query,
-                          f_cutoff = 10,
-                          r2 = 0.001, kb = 10000, pop = "EUR",
-                          proxies = T,
-                          action = 1,
-                          bfile = NULL, plink_bin = NULL,
-                          nthreads = 1)
+                          conf)
 {
   # Bad practice to loop over an object which may be altered by that loop
   rows_id1 <- nrow(id1$info)
@@ -42,14 +21,14 @@ read_datasets <- function(id1, id2,
     # Load locally from vcf
     if (file.exists(f) & tools::file_ext(f) == "vcf")
     {
-      dat <- gwasvcf::query_gwas(vcf = VariantAnnotation::readVcf(f), pval = -log10(p_cutoff)) %>%
+      dat <- gwasvcf::query_gwas(vcf = VariantAnnotation::readVcf(f), pval = -log10(conf$p_cutoff)) %>%
         gwasglue::gwasvcf_to_TwoSampleMR("exposure") %>%
         dplyr::mutate(exposure = id1$info$trait[i],
                       trait.exposure = id1$info$trait[i],
                       id.exposure = id1$info$trait[i])
 
       # F-statistic
-      ret <- .calc_f_stat(dat, f_cutoff)
+      ret <- .calc_f_stat(dat, conf$f_cutoff)
       dat <- ret[[1]]
       rem.f.stat <- ret[[2]]
 
@@ -63,8 +42,11 @@ read_datasets <- function(id1, id2,
         dat <- dplyr::mutate(dat,
                              rsid = SNP,
                              pval = pval.exposure) %>%
-          ieugwasr::ld_clump(clump_kb = kb, clump_r2 = r2, pop = pop,
-                             bfile = bfile, plink_bin = plink_bin)
+          ieugwasr::ld_clump(clump_kb = conf$clump_kb,
+                             clump_r2 = conf$clump_r2,
+                             pop = conf$pop,
+                             bfile = conf$bfile_path,
+                             plink_bin = conf$plink_path)
         #dat %<>% TwoSampleMR::clump_data(clump_kb = kb, clump_r2 = r2, pop = pop)
 
         #f_plot(dat, report)
@@ -93,12 +75,12 @@ read_datasets <- function(id1, id2,
     {
       # From OpenGWAS
       dat <- TwoSampleMR::extract_instruments(id1$info$id[i],
-                                              p1 = p_cutoff,
-                                              clump = ifelse(is.null(bfile) & is.null(plink_bin),
+                                              p1 = conf$p_cutoff,
+                                              clump = ifelse(is.null(conf$bfile_path) & is.null(conf$plink_path),
                                                              T,
                                                              F),
-                                              r2 = r2,
-                                              kb = kb)
+                                              r2 = conf$clump_r2,
+                                              kb = conf$clump_kb)
 
       # Nothing extracted - remove ID and return
       if (length(dat) < 1) {
@@ -112,17 +94,20 @@ read_datasets <- function(id1, id2,
 
       dat$exposure <- trimws(dat$exposure)
 
-      if (!is.null(bfile) & !is.null(plink_bin))
+      if (!is.null(conf$bfile_path) & !is.null(conf$plink_path))
       {
         dat <- dplyr::mutate(dat,
                              rsid = SNP,
                              pval = pval.exposure) %>%
-          ieugwasr::ld_clump(clump_kb = kb, clump_r2 = r2, pop = pop,
-                             bfile = bfile, plink_bin = plink_bin)
+          ieugwasr::ld_clump(clump_kb = conf$clump_kb,
+                             clump_r2 = conf$clump_r2,
+                             pop = conf$pop,
+                             bfile = conf$bfile_path,
+                             plink_bin = conf$plink_path)
       }
 
       # F-statistic
-      ret <- .calc_f_stat(dat, f_cutoff)
+      ret <- .calc_f_stat(dat, conf$f_cutoff)
       dat <- ret[[1]]
       rem.f.stat <- ret[[2]]
 
@@ -137,7 +122,7 @@ read_datasets <- function(id1, id2,
                              id1$info$id[i],
                              id1$info$trait[i],
                              nrow(dat),
-                             ifelse(is.null(bfile) & is.null(plink_bin), T, F),
+                             ifelse(is.null(conf$bfile_path) & is.null(conf$plink_path), T, F),
                              rem.f.stat,
                              0,
                              nrow(dat),
@@ -153,7 +138,7 @@ read_datasets <- function(id1, id2,
     }
 
     return (dat)
-  }, mc.cores = nthreads) %>%
+  }, mc.cores = conf$cores) %>%
     dplyr::bind_rows()
 
   # Remove those IDs with no data from future analyses
@@ -195,7 +180,7 @@ read_datasets <- function(id1, id2,
     } else
     {
       # From OpenGWAS
-      dat <- TwoSampleMR::extract_outcome_data(rsids, id2$info$id[i], proxies = proxies) %>%
+      dat <- TwoSampleMR::extract_outcome_data(rsids, id2$info$id[i], proxies = conf$proxies) %>%
         tidyr::separate(outcome, "outcome", sep = "\\|\\|", extra = "drop") %>%
         dplyr::mutate(id.outcome = id2$info$trait[i])
 
@@ -227,10 +212,10 @@ read_datasets <- function(id1, id2,
     }
 
     return(dat)
-  }, mc.cores = nthreads) %>%
+  }, mc.cores = conf$cores) %>%
     dplyr::bind_rows()
 
-  dat <- TwoSampleMR::harmonise_data(exposure_dat, outcome_dat, action = action)
+  dat <- TwoSampleMR::harmonise_data(exposure_dat, outcome_dat, action = conf$harmonise_action)
   return(dat)
 }
 
@@ -343,8 +328,10 @@ DatasetIDs <- setRefClass("DatasetIDs",
     warning("biomaRt is currently unavailable and so ENSG IDs will not be annotated.")
   })
 
-  if (is.na(mart.gene) | !exists("mart.gene")) {
-    return(NULL)
+  if (exists("mart.gene")) {
+    if (class(mart.gene) != "Mart") {
+      return(NULL)
+    }
   }
 
   results <- getBM(attributes=c('ensembl_gene_id', 'hgnc_symbol'),
