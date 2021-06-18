@@ -290,5 +290,111 @@ interactive_scatter_plot <- function(dat, id.exposure, id.outcome)
 #' UNIMPLEMENTED
 forest_plot <- function(res, dat, report)
 {
+  if (!nrow(res) || !length(res)) {
+    return()
+  }
 
+  #res <- res[res$method %in% c("Wald ratio", "Inverse variance weighted"), ]
+
+  #if (!nrow(res)) {
+  #  return()
+  #}
+
+  id <- unique(res[["id.exposure"]])
+  name <- unique(res[["exposure"]])
+
+  fontsize <- 0.7
+  cpositions <- c(0.02, 0.22, 0.4)
+  xlab <- ""
+  ylab <- ""
+  nodigits <- 2 # Number of digits to show
+  main <- "Forest Plot of MR Results"
+
+  # Build clean df
+  toShow <- res
+  toShow <- toShow[c("exposure", "outcome", "method", "b", "se", "pval", "lo_ci", "up_ci")]
+  toShow$estimate <- round(exp(toShow$b), nodigits)
+  toShow$conf.low <- round(exp(toShow$lo_ci), nodigits)
+  toShow$conf.high <- round(exp(toShow$up_ci), nodigits)
+  toShow$ci <- paste0("(",toShow$conf.low," - ",toShow$conf.high,")")
+  toShow$p.value <- signif(toShow$pval, nodigits+1)
+  toShow$stars <- paste0(round(toShow$pval, 3), " ",
+                         ifelse(toShow$pval < 0.05, "*",""),
+                         ifelse(toShow$pval < 0.01, "*",""),
+                         ifelse(toShow$pval < 0.001,"*",""))
+  toShow$stars[which(toShow$pval < 0.001)] = "<0.001 ***"
+  toShow$ci[is.na(toShow$b)] = ""
+  toShow$estimate[is.na(toShow$b)] = 0
+
+  terms <- paste0(toShow$exposure, " | ", toShow$outcome, " | ", toShow$method)
+  coeffs <- res$b
+  lower <- res$lo_ci
+  upper <- res$up_ci
+
+  # Graphing stuff
+  rangeb <- range(lower, upper, na.rm = TRUE)
+  breaks <- axisTicks(rangeb/2, log = TRUE, nint = 7)
+  rangeplot <- rangeb
+  rangeplot[1] <- rangeplot[1] - diff(rangeb)
+  rangeplot[2] <- rangeplot[2] + .15 * diff(rangeb)
+
+  width <- diff(rangeplot)
+  # y co-ords for labels:
+  y_variable <- rangeplot[1] + cpositions[1] * width
+  y_nlevel <- rangeplot[1] + cpositions[2] * width
+  y_cistring <- rangeplot[1] + cpositions[3] * width
+  y_stars <- rangeb[2]
+  x_annotate <- seq_along(terms)
+  annot_size_mm <- fontsize *
+    as.numeric(convertX(unit(theme_get()$text$size, "pt"), "mm"))
+
+  p <- ggplot(data=res, aes(seq_along(terms), exp(coeffs))) +
+    geom_rect(aes(xmin = seq_along(terms) - .5, xmax = seq_along(terms) + .5,
+                  ymin = exp(rangeplot[1]), ymax = exp(rangeplot[2]),
+                  fill = ordered(seq_along(terms) %% 2 + 1))) +
+    scale_fill_manual(values = c("#FFFFFF33", "#00000033"), guide = "none") +
+    geom_point(pch = 15, size = 4) +
+    xlab(ylab) +
+    ylab(xlab) +
+    geom_errorbar(aes(ymin = exp(lower), ymax = exp(upper)), width = 0.15) +
+    geom_hline(yintercept = 1, linetype = 3) +
+    coord_flip(ylim = exp(rangeplot)) +
+    ggtitle(main) +
+    scale_y_log10(
+      labels = sprintf("%g", breaks),
+      expand = c(0.02, 0.02),
+      breaks = breaks) +
+    theme_light() +
+    theme(panel.grid.minor.y = element_blank(),
+          panel.grid.minor.x = element_blank(),
+          panel.grid.major.y = element_blank(),
+          legend.position = "none",
+          panel.border=element_blank(),
+          #axis.title.y=element_blank(),
+          axis.text.y=element_blank(),
+          axis.ticks.y=element_blank(),
+          axis.title.x=element_text(hjust=0.7),
+          plot.title = element_text(hjust = 0.5)) +
+    annotate(geom = "text", x = x_annotate, y = exp(y_variable),
+             label = terms, fontface = "bold", hjust = 0,
+             size = annot_size_mm) +
+    annotate(geom = "text", x = x_annotate, y = exp(y_cistring),
+             label = toShow$estimate, size = annot_size_mm,
+             vjust = ifelse(toShow$estimate == "reference", .5, -0.1)) +
+    annotate(geom = "text", x = x_annotate, y = exp(y_cistring),
+             label = toShow$ci, size = annot_size_mm,
+             vjust = 1.1,  fontface = "italic") +
+    annotate(geom = "text", x = x_annotate, y = exp(y_stars),
+             label = toShow$stars, size = annot_size_mm,
+             hjust = -0.2,  fontface = "italic")
+
+  gt <- ggplot_gtable(ggplot_build(p))
+  gt$layout$clip[gt$layout$name == "panel"] <- "off"
+
+  report$add_plot(list(id1 = id,
+                       id2 = NA,
+                       name1 = name,
+                       name2 = "",
+                       type = "forest"),
+                  gt)
 }

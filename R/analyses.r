@@ -135,6 +135,11 @@ do_mr <- function(dat, report, conf)
     dplyr::group_by(id.exposure) %>%
     dplyr::group_map(~ phewas_plot(.x, report), .keep = T)
 
+  # Forest plot of MR results
+  res %>%
+    dplyr::group_by(id.exposure) %>%
+    dplyr::group_map(~ forest_plot(.x, dat, report), .keep = T)
+
   # Report results separately
   main <- res[res$method %in% c("Wald ratio", "Inverse variance weighted"),]
   sensitivity <- res[!(res$method %in% c("Wald ratio", "Inverse variance weighted")),]
@@ -165,6 +170,9 @@ do_mr <- function(dat, report, conf)
   report$add_sresults("steigerresults", steigerres)
 
   report$bonferroni <- 0.05 / nrow(main)
+  if (conf$bonferroni_mr_p_thres == T) {
+    conf$mr_p_thres <- report$bonferroni
+  }
 
   return(res)
 }

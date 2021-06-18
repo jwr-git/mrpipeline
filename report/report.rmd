@@ -7,6 +7,7 @@ output:
     toc_float: true
 params:
   report: "report"
+  conf: "conf"
   dat: "dat"
   name: "filename"
 ---
@@ -196,12 +197,17 @@ params$dat[, colnames(params$dat) %in% c("SNP",
 
 # Overview of Results
 
-This shows a basic overview of all of the results, which are given in more detail below and in individual reports. This overview shows a basic "Pass" or "Fail" mark if that exposure-outcome pair passes or fails that analysis.
+This shows a basic overview of all of the results, which are given in more detail below and in individual reports. This overview shows a basic "Pass" or "Fail" mark if that exposure-outcome pair passes or fails that analysis. Passes are defined for each of the analyses:
+<ul>
+  <li> MR: P value < `r conf$mr_p_thres`.
+  <li> Steiger filtering: P < 0.05 and correctly estimated direction of effect.
+  <li> Colocalisation: H4 > `r conf$coloc_strong_thres` is strong evidence, H4 > `r conf$coloc_moderate_thres` is moderate evidence, and weak evidence otherwise.
+</ul>
 
 ```{r}
 mrres <- params$report$results %>%
   dplyr::select(id.exposure, id.outcome, exposure, outcome, pval) %>%
-  dplyr::mutate(mrflag = ifelse(pval < 0.05, "Pass", "Fail"))
+  dplyr::mutate(mrflag = ifelse(pval < conf$mr_p_thres, "Pass", "Fail"))
 
 steigerres <- params$report$steigerresults %>%
   dplyr::select(id.exposure, id.outcome, flag) %>%
@@ -211,8 +217,8 @@ steigerres <- params$report$steigerresults %>%
 colocres <- params$report$cresults %>%
   dplyr::select(name1, name2, nsnps, H4) %>%
   dplyr::rename(exposure = name1, outcome = name2) %>%
-  dplyr::mutate(colocflag = ifelse(H4 > 0.8 & nsnps > 50, "Strong",
-                                   ifelse(H4 > 0.5 & nsnps > 50, "Moderate", "Weak"))) %>%
+  dplyr::mutate(colocflag = ifelse(H4 > conf$coloc_strong_thres & nsnps > 50, "Strong",
+                                   ifelse(H4 > conf$coloc_moderate_thres & nsnps > 50, "Moderate", "Weak"))) %>%
   dplyr::mutate(colocflag = ifelse(colocflag == "", "NA", colocflag))
 
 dplyr::left_join(mrres, steigerres, by = c("id.exposure", "id.outcome")) %>%

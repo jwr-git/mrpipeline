@@ -96,3 +96,11 @@ default:
   # Prior probability a SNP is associated with both traits
   # in the colocalisation analyses
   coloc_p12: 1.0e-5
+  
+  # Threshold for H4 for results from the colocalisation analysis
+  # to be considered strong evidence of colocalisation
+  coloc_strong_thres: 0.8
+  
+  # Threshold for H4 for results from the colocalisation analysis
+  # to be considered moderate evidence of colocalisation
+  coloc_moderate_thres: 0.5

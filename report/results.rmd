@@ -7,11 +7,14 @@ output:
     toc_float: true
 params:
   report: "report"
+  conf: "conf"
   dat: "dat"
   id.exposure: "id.exposure"
   trait.name: "trait.name"
   new_title: "Per-trait results"
 title: "`r params$new_title`"
+fig_width: 6
+fig_height: 4
 ---
 
 ```{r setup, include=FALSE}
@@ -262,16 +265,30 @@ results %>%
 
 Plots shown here include scatter and forest plots of results, if they are generated (some may require many SNPs).
 
+## Forest Plot {.tabset}
+
+Forest plot showing the MR results for each outcome.
+
+```{r forest-plot, echo = F, message = F, warning = F, dpi=300, fig.width=4, fig.height=4}
+if (exists("raw.plots")) {
+  grid.newpage()
+  grid.draw(raw.plots[[as.integer(rownames(plots[plots$type == "forest", ]))]])
+}
+```
+
 ## Volcano Plot {.tabset}
-```{r volcano-plot, echo = F, warning = F, dpi=300, fig.width=2, fig.height=2}
+
+Volcano plot of the individual SNP Wald ratios.
+
+```{r volcano-plot, echo = F, message = F, warning = F, dpi=300, fig.width=2, fig.height=2}
 #raw.plots[as.integer(rownames(plots[plots$type == "volcano", ]))]
-automrpipeline::interactive_volcano_plot(dat[dat$id.exposure == id.exposure,])
+mrpipeline::interactive_volcano_plot(dat[dat$id.exposure == id.exposure,])
 grid.newpage()
 ```
 
 ## PheWAS-like Plot {.tabset}
 ```{r phewas-plot, echo = F, message = F, warning = F, results = F}
-if (exists("raw.plot")) {
+if (exists("raw.plots")) {
   raw.plots[as.integer(rownames(plots[plots$type == "phewas", ]))]
 }
 ```

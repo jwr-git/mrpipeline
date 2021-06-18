@@ -84,7 +84,7 @@ mr_pipeline <- function(ids1, ids2,
   for (id.exposure in id1$info$id)
   {
     trait.name <- id1$info[id1$info$id == id.exposure, ]$trait
-    make_results(out_path, out_name, report, dat[dat$id.exposure == id.exposure, ], id.exposure, trait.name)
+    make_results(out_path, out_name, report, conf, dat[dat$id.exposure == id.exposure, ], id.exposure, trait.name)
   }
 
   # Per-outcome report
@@ -95,7 +95,7 @@ mr_pipeline <- function(ids1, ids2,
   }
 
   # Main report file
-  make_report(out_path, out_name, dat, report)
+  make_report(out_path, out_name, dat, report, conf)
 
   return(list(dat, res, cres, report, id1, id2))
 }

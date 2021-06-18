@@ -170,12 +170,13 @@ QCReport <- setRefClass("QCReport",
 #' @param report QCReport class of results, etc. for reporting
 #'
 #' @return NULL
-make_report <- function(filepath, filename, dat, report)
+make_report <- function(filepath, filename, dat, report, conf)
 {
   rmarkdown::render(input = "report/report.rmd",
                     output_dir = paste0(filepath, "\\", filename),
                     output_file = "report.html",
                     params = list(report = report,
+                                  conf = conf,
                                   dat = dat,
                                   name = filename)
                     )
@@ -191,12 +192,13 @@ make_report <- function(filepath, filename, dat, report)
 #' @param trait.name Annotated name of exposure
 #'
 #' @return NULL
-make_results <- function(filepath, filename, report, dat, id.exposure, trait.name)
+make_results <- function(filepath, filename, report, conf, dat, id.exposure, trait.name)
 {
   rmarkdown::render(input = "report/results.rmd",
                     output_dir = paste0(filepath, "\\", filename, "\\traits"),
                     output_file = paste0(trait.name, ".html"),
                     params = list(report = report,
+                                  conf = conf,
                                   dat = dat,
                                   id.exposure = id.exposure,
                                   trait.name = trait.name,
