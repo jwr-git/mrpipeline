@@ -69,6 +69,10 @@ mr_pipeline <- function(ids1, ids2,
   # Heterogeneity between instruments
   #hret <- do_heterogeneity(dat, report)
 
+  # Drug target-related
+  ot_res <- ot_linkage(id1, id2, report)
+  dgidb_linkage(id1, id2, report)
+
   # Where are we saving the reports?
   out_path <- conf$out_path
 
@@ -97,7 +101,7 @@ mr_pipeline <- function(ids1, ids2,
   # Main report file
   make_report(out_path, out_name, dat, report, conf)
 
-  return(list(dat, res, cres, report, id1, id2))
+  return(list(dat, res, cres, report, id1, id2, ot_res))
 }
 
 #' Annotates the data using given IDs
@@ -169,3 +173,6 @@ validate_config <- function(conf)
 
 # Biogen test
 #retval <- mr_pipeline(c("eqtl-a-ENSG00000196296", "eqtl-a-ENSG00000140623", "eqtl-a-ENSG00000067836","eqtl-a-ENSG00000267795", "eqtl-a-ENSG00000061656", "eqtl-a-ENSG00000256762", "eqtl-a-ENSG00000185294", "eqtl-a-ENSG00000120071", "eqtl-a-ENSG00000185829", "eqtl-a-ENSG00000238083", "eqtl-a-ENSG00000228696", "eqtl-a-ENSG00000225190", "eqtl-a-ENSG00000153574", "eqtl-a-ENSG00000203760", "eqtl-a-ENSG00000166037", "eqtl-a-ENSG00000187323", "eqtl-a-ENSG00000101306", "eqtl-a-ENSG00000005059", "eqtl-a-ENSG00000168214"), c("ieu-a-1044", "ieu-a-1045", "ieu-a-1041", "ieu-a-1046", "ieu-a-1047", "ieu-a-1048"))
+
+# Denis stuff
+#retval <- mr_pipeline(c("eqtl-a-ENSG00000254858", "eqtl-a-ENSG00000215912", "eqtl-a-ENSG00000173226", "eqtl-a-ENSG00000162695", "eqtl-a-ENSG00000159640", "eqtl-a-ENSG00000203710"), c("ieu-b-18", "ieu-b-2")))

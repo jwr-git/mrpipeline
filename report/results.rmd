@@ -269,7 +269,7 @@ Plots shown here include scatter and forest plots of results, if they are genera
 
 Forest plot showing the MR results for each outcome.
 
-```{r forest-plot, echo = F, message = F, warning = F, dpi=300, fig.width=4, fig.height=4}
+```{r forest-plot, echo = F, message = F, warning = F, dpi=400, fig.width=12, fig.height=6}
 if (exists("raw.plots")) {
   grid.newpage()
   grid.draw(raw.plots[[as.integer(rownames(plots[plots$type == "forest", ]))]])
@@ -367,3 +367,79 @@ if (length(cresults) && nrow(cresults) > 0) {
 ```
 
 `r if (!length(cresults) || nrow(cresults) < 1 || !length(cresults[cresults["nsnps"] > 50, ])) { "\\end{comment}" }`
+
+# Drug Target Profile
+
+This section contains evidence for the given target for each of the outcomes given. Evidence is collected from:
+
+## Open Targets
+
+```{r ot-table}
+brks <- seq(from = 0, to = 1, by = 0.1)
+clrs <- round(seq(180, 40, length.out = length(brks) + 1), 0) %>%
+  {paste0("rgb(", ., ",", ., ",180)")}
+
+to_table <-params$report$otresults[params$report$otresults$id1 == params$id.exposure, ] %>%
+  dplyr::select(-id1, -id2) %>%
+  dplyr::relocate(name2, .after = name1) %>%
+  dplyr::rename(Exposure = name1,
+                Outcome = name2,
+                Overall.Score = overall.ot,
+                Literature = literature.ot,
+                RNA.Expression = rna_expression.ot,
+                Genetic.Assoc = genetic_assoc.ot,
+                Somatic.Mutations = somatic_mute.ot,
+                Known.Drugs = known_drug.ot,
+                Animal.Model = animal_model.ot,
+                Affected.Pathways = affected_pathway.ot)
+
+to_table %>%
+  DT::datatable(rownames = F,
+                escape = F,
+                filter = 'top',
+                extensions = c("Buttons"),
+                options = list(order = list(2, "desc"), 
+                               dom = "Bfrtip", 
+                               buttons = list('copy',
+                                              list(extend = 'collection', 
+                                                   buttons = c('csv', 'excel'), 
+                                                   text = 'Download')))) %>%
+    DT::formatSignif(columns = c("Overall.Score", 
+                               "Literature", 
+                               "RNA.Expression", 
+                               "Genetic.Assoc",
+                               "Somatic.Mutations",
+                               "Known.Drugs",
+                               "Animal.Model",
+                               "Affected.Pathways"), 
+                   digits = 3) #%>%
+  #DT::formatStyle(names(to_table), backgroundColor = DT::styleInterval(brks, clrs))
+```
+
+## Drug-Genome Interaction DB
+
+```{r colourise}
+colourise <- function(type) {
+  if (params$report$dgidbresults[params$report$dgidbresults$id == params$id.exposure, ][type] == T) {
+    clr <- "green;font-weight:bold"
+  } else {
+    clr <- "lightgrey"
+  }
+  
+  ttip <- ""
+  if (type == "Druggable.Genome") {
+    ttip <- paste0('This target is', if (params$report$dgidbresults[params$report$dgidbresults$id == params$id.exposure, ]$Druggable.Genome == F) { ' not' }, ' considered to be part of the Druggable Genome. This is defined as genes, or gene products, which have either known or predicted interactions with drugs. Sources for this category usually come from published databases which are publicly available for searching, for example, ["The druggable genome and support for target identification and validation in drug development"](http://www.ncbi.nlm.nih.gov/pubmed/28356508) by Finan, et al. and ["The druggable genome"](http://www.ncbi.nlm.nih.gov/pubmed/12209152) by Hopkins, et al.')
+  } else if (type == "Clinically.Actionable") {
+    ttip <- paste0('This target is', if (params$report$dgidbresults[params$report$dgidbresults$id == params$id.exposure, ]$Clinically.Actionable == F) { ' not' }, ' considered to be Clinically Actionable. Genes which are clinically actionable are those genes, or their products, which inform on clinical decisions and are used by clinicians to guide interventions. Sources for this category come from published works which detail diagnostic panels, for example, in the case of ["High-throughput detection of actionable genomic alterations in clinical tumor samples by targeted, massively parallel sequencing"](https://pubmed.ncbi.nlm.nih.gov/22585170/) by Wagle, et al. which details genes which can guide clinical interventions for cancer.')
+  } else if (type == "Drug.Resistant") {
+    ttip <- paste0('This target is', if (params$report$dgidbresults[params$report$dgidbresults$id == params$id.exposure, ]$Drug.Resistant == F) { ' not' }, ' considered to be resistant against drugs. The main source of this category comes from the EBI [Gene Ontology](https://www.ebi.ac.uk/QuickGO/term/GO:0042493) "response to drug" category. Caution should be given to naive interpretation of this category if more than one class of drugs may be used to target that gene -- for example, the gene of interest may be resistant to one class of drug but not another.')
+  }
+  tippy::tippy(sprintf("<span style='color: %s;'>| %s </span>", clr, type), tooltip = ttip, allowHTML = T)
+}
+```
+
+`r colourise("Druggable.Genome")` `r colourise("Clinically.Actionable")` `r colourise("Drug.Resistant")`
+
+
+The Drug-Genome Interaction DB (DGIdB) collates evidence relevant to drug discovery efforts, for example, by categorising targets with ontology such as "part of the druggable genome", with the aim of improving and aiding drug discovery efforts. This section provides details on the three main ontologies.
+

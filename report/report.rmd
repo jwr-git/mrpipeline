@@ -45,7 +45,186 @@ This page contains an overview for the analyses that have been carried out. Link
 
 Details and explanations of analyses and results are given throughout. Certain terms related to MR are hyperlinked to the MR Dictionary, which offers an explanation for that term.
 
-# Overview of Datasets
+# Overview of Results
+
+This shows a basic overview of all of the results, which are given in more detail below and in individual reports. This overview shows a basic "Pass" or "Fail" mark if that exposure-outcome pair passes or fails that analysis. Passes are defined for each of the analyses:
+<ul>
+  <li> MR: P value < `r conf$mr_p_thres`.
+  <li> Steiger filtering: P < 0.05 and correctly estimated direction of effect.
+  <li> Colocalisation: H4 > `r conf$coloc_strong_thres` is strong evidence, H4 > `r conf$coloc_moderate_thres` is moderate evidence, and weak evidence otherwise.
+</ul>
+
+```{r overview_res}
+mrres <- params$report$results %>%
+  dplyr::select(id.exposure, id.outcome, exposure, outcome, pval) %>%
+  dplyr::mutate(mrflag = ifelse(pval < conf$mr_p_thres, "Pass", "Fail"))
+
+steigerres <- params$report$steigerresults %>%
+  dplyr::select(id.exposure, id.outcome, flag) %>%
+  dplyr::mutate(flag = ifelse(flag == "True", "Pass",
+                              ifelse(flag == "Unknown", "Uncertain", "Fail")))
+
+colocres <- params$report$cresults %>%
+  dplyr::select(name1, name2, nsnps, H4) %>%
+  dplyr::rename(exposure = name1, outcome = name2) %>%
+  dplyr::mutate(colocflag = ifelse(H4 > conf$coloc_strong_thres & nsnps > 50, "Strong",
+                                   ifelse(H4 > conf$coloc_moderate_thres & nsnps > 50, "Moderate", "Weak"))) %>%
+  dplyr::mutate(colocflag = ifelse(colocflag == "", "NA", colocflag))
+
+#dgidbres <- params$reports$dgidbresults %>%
+#  dplyr::select(id, Druggable.Genome, Clinically.Actionable, Drug.Resistant) %>%
+#  dplyr::rename(Drug.Genome = Druggable.Genome,
+#                Clin.Act = Clinically.Actionable) %>%
+#  dplyr::mutate(Drug.Genome = ifelse(Drug.Genome == T, "Y", "N"),
+#                Clin.Act = ifelse(Clin.Act == T, "Y", "N"),
+#                Drug.Resistant = ifelse(Drug.Resistant == T, "Y", "N"))
+
+dplyr::left_join(mrres, steigerres, by = c("id.exposure", "id.outcome")) %>%
+  dplyr::left_join(colocres, by = c("exposure", "outcome")) %>%
+#  dplyr::left_join(dgidbres, by = c("id.exposure" = "id")) %>%
+  dplyr::select(-pval, -nsnps, -H4) %>%
+  dplyr::rename(Exposure.ID = id.exposure,
+                Outcome.ID = id.outcome,
+                Exposure = exposure,
+                Outcome = outcome,
+                MR.Pass = mrflag,
+                Steiger.Pass = flag,
+                Coloc.Pass = colocflag) %>%
+  dplyr::mutate(Exposure = paste0("<a href='./traits/", Exposure, ".html'>", Exposure, "</a>")) %>%
+  dplyr::mutate(Outcome = paste0("<a href='./traits/", Outcome, ".html'>", Outcome, "</a>")) %>%
+  dplyr::relocate(Exposure, Outcome,
+                  Exposure.ID, Outcome.ID,
+                  MR.Pass, Steiger.Pass, Coloc.Pass) %>%
+  DT::datatable(rownames = F,
+                escape = F,
+                caption = "Overview of all results",
+                filter = "top",
+                extensions = c("Buttons"),
+                options = list(dom = "BDfrtip", 
+                               buttons = list('copy',
+                                              list(extend = 'collection', 
+                                                   buttons = c('csv', 'excel'), 
+                                                   text = 'Download')))) %>%
+  DT::formatStyle(
+    "MR.Pass",
+    color = DT::styleEqual(c("Pass", "Fail"),
+                           c("darkgreen", "red")),
+    fontWeight = DT::styleEqual("Pass", "bold")
+  ) %>%
+  DT::formatStyle(
+    "Steiger.Pass",
+    color = DT::styleEqual(c("Pass", "Uncertain", "Fail"),
+                           c("darkgreen", "orange", "red")),
+    fontWeight = DT::styleEqual("Pass", "bold")
+  ) %>%
+  DT::formatStyle(
+    "Coloc.Pass",
+    color = DT::styleEqual(c("Strong", "Moderate", "Weak", "NA"),
+                           c("darkgreen", "orange", "red", "red")),
+    fontWeight = DT::styleEqual("Strong", "bold")
+  )# %>% 
+#  DT::formatStyle(
+#    c("Drug.Genome", "Clin.Act", "Drug.Resistant"),
+#    color = DT::styleEqual(c("Y", "N"),
+#                           c("darkgreen", "red")),
+#    fontWeight = DT::styleEqual("Y", "bold")
+#  )
+```
+
+# Overview of Drug Target Evidence
+
+## Open Targets Platform
+
+```{r ot-table}
+brks <- seq(from = 0, to = 1, by = 0.1)
+clrs <- round(seq(180, 40, length.out = length(brks) + 1), 0) %>%
+  {paste0("rgb(", ., ",", ., ",180)")}
+
+to_table <- params$report$otresults %>%
+  dplyr::select(-id1, -id2) %>%
+  dplyr::relocate(name2, .after = name1) %>%
+  dplyr::rename(Exposure = name1,
+                Outcome = name2,
+                Overall.Score = overall.ot,
+                Literature = literature.ot,
+                RNA.Expression = rna_expression.ot,
+                Genetic.Assoc = genetic_assoc.ot,
+                Somatic.Mutations = somatic_mute.ot,
+                Known.Drugs = known_drug.ot,
+                Animal.Model = animal_model.ot,
+                Affected.Pathways = affected_pathway.ot)
+
+to_table %>%
+  DT::datatable(rownames = F,
+                escape = F,
+                filter = 'top',
+                extensions = c("Buttons"),
+                options = list(order = list(2, "desc"), 
+                               dom = "Bfrtip", 
+                               buttons = list('copy',
+                                              list(extend = 'collection', 
+                                                   buttons = c('csv', 'excel'), 
+                                                   text = 'Download')))) %>%
+    DT::formatSignif(columns = c("Overall.Score", 
+                               "Literature", 
+                               "RNA.Expression", 
+                               "Genetic.Assoc",
+                               "Somatic.Mutations",
+                               "Known.Drugs",
+                               "Animal.Model",
+                               "Affected.Pathways"), 
+                   digits = 3) %>%
+  DT::formatStyle(names(to_table),
+                  background = DT::styleColorBar(range(0, 1), 'lightblue'),
+                  backgroundSize = '98% 88%',
+                  backgroundRepeat = 'no-repeat',
+                  backgroundPosition = 'center')
+```
+
+## Drug-Genome Interaction DB
+
+```{r dgidb-table}
+params$report$dgidbresults %>%
+  dplyr::select(-id) %>%
+  dplyr::rename(Trait = trait) %>%
+  dplyr::mutate(Druggable.Genome = ifelse(Druggable.Genome == T, "Yes", "No"),
+                Clinically.Actionable = ifelse(Clinically.Actionable == T, "Yes", "No"),
+                Drug.Resistant = ifelse(Drug.Resistant == T, "Yes", "No")) %>%
+  DT::datatable(rownames = F,
+                escape = F,
+                filter = 'top',
+                extensions = c("Buttons"),
+                options = list(order = list(0, "asc"),
+                               dom = "Bfrtip",
+                               buttons = list ('copy',
+                                               list(extend = 'collection',
+                                                    buttons = c('csv', 'excel'),
+                                                    text = 'Download')))) %>%
+  DT::formatStyle(
+    c("Druggable.Genome", "Clinically.Actionable", "Drug.Resistant"),
+    color = DT::styleEqual(c("Yes", "No"),
+                           c("darkgreen", "red")),
+    fontWeight = DT::styleEqual("Yes", "bold")
+  )
+```
+
+## Possible Drugs
+
+```{r dgidb-drugs}
+params$report$dgidbdrugs %>%
+  dplyr::select(-id) %>%
+  dplyr::rename(Trait = trait) %>%
+  DT::datatable(rownames = F,
+                filter = 'top',
+                extensions = c("Buttons"),
+                options = list(dom = "Bfrtip",
+                               buttons = list ('copy',
+                                               list(extend = 'collection',
+                                                    buttons = c('csv', 'excel'),
+                                                    text = 'Download'))))
+```
+
+# Datasets
 
 Tables presented here contain a breakdown and overview of the datasets. Trait.Name links take you to the specific trait results page and the Trait.ID links will take you to the OpenGWAS DB report, if applicable for that trait.
 
@@ -195,75 +374,6 @@ params$dat[, colnames(params$dat) %in% c("SNP",
   DT::formatSignif(columns = c("P.value"), digits = 3)
 ```
 
-# Overview of Results
-
-This shows a basic overview of all of the results, which are given in more detail below and in individual reports. This overview shows a basic "Pass" or "Fail" mark if that exposure-outcome pair passes or fails that analysis. Passes are defined for each of the analyses:
-<ul>
-  <li> MR: P value < `r conf$mr_p_thres`.
-  <li> Steiger filtering: P < 0.05 and correctly estimated direction of effect.
-  <li> Colocalisation: H4 > `r conf$coloc_strong_thres` is strong evidence, H4 > `r conf$coloc_moderate_thres` is moderate evidence, and weak evidence otherwise.
-</ul>
-
-```{r}
-mrres <- params$report$results %>%
-  dplyr::select(id.exposure, id.outcome, exposure, outcome, pval) %>%
-  dplyr::mutate(mrflag = ifelse(pval < conf$mr_p_thres, "Pass", "Fail"))
-
-steigerres <- params$report$steigerresults %>%
-  dplyr::select(id.exposure, id.outcome, flag) %>%
-  dplyr::mutate(flag = ifelse(flag == "True", "Pass",
-                              ifelse(flag == "Unknown", "Uncertain", "Fail")))
-
-colocres <- params$report$cresults %>%
-  dplyr::select(name1, name2, nsnps, H4) %>%
-  dplyr::rename(exposure = name1, outcome = name2) %>%
-  dplyr::mutate(colocflag = ifelse(H4 > conf$coloc_strong_thres & nsnps > 50, "Strong",
-                                   ifelse(H4 > conf$coloc_moderate_thres & nsnps > 50, "Moderate", "Weak"))) %>%
-  dplyr::mutate(colocflag = ifelse(colocflag == "", "NA", colocflag))
-
-dplyr::left_join(mrres, steigerres, by = c("id.exposure", "id.outcome")) %>%
-  dplyr::left_join(colocres, by = c("exposure", "outcome")) %>%
-  dplyr::select(-pval, -nsnps, -H4) %>%
-  dplyr::rename(Exposure.ID = id.exposure,
-                Outcome.ID = id.outcome,
-                Exposure = exposure,
-                Outcome = outcome,
-                MR.Pass = mrflag,
-                Steiger.Pass = flag,
-                Coloc.Pass = colocflag) %>%
-  dplyr::relocate(Exposure, Outcome,
-                  Exposure.ID, Outcome.ID,
-                  MR.Pass, Steiger.Pass, Coloc.Pass) %>%
-  DT::datatable(rownames = F,
-                caption = "Overview of all results",
-                filter = "top",
-                extensions = c("Buttons"),
-                options = list(dom = "BDfrtip", 
-                               buttons = list('copy',
-                                              list(extend = 'collection', 
-                                                   buttons = c('csv', 'excel'), 
-                                                   text = 'Download')))) %>%
-  DT::formatStyle(
-    "MR.Pass",
-    color = DT::styleEqual(c("Pass", "Fail"),
-                           c("darkgreen", "red")),
-    fontWeight = DT::styleEqual("Pass", "bold")
-  ) %>%
-  DT::formatStyle(
-    "Steiger.Pass",
-    color = DT::styleEqual(c("Pass", "Uncertain", "Fail"),
-                           c("darkgreen", "orange", "red")),
-    fontWeight = DT::styleEqual("Pass", "bold")
-  ) %>%
-  DT::formatStyle(
-    "Coloc.Pass",
-    color = DT::styleEqual(c("Strong", "Moderate", "Weak", "NA"),
-                           c("darkgreen", "orange", "red", "red")),
-    fontWeight = DT::styleEqual("Strong", "bold")
-  )
-```
-
-
 # MR Results
 
 MR results are presented here for the [Wald ratio](https://mr-dictionary.mrcieu.ac.uk/term/wald-ratio/) (WR) and [inverse variance weighted](https://mr-dictionary.mrcieu.ac.uk/term/ivw/) (IVW). The per-trait reports detail further MR methods, such as [MR-Egger](https://mr-dictionary.mrcieu.ac.uk/term/mr-egger/), but are omitted here for brevity.
@@ -356,7 +466,7 @@ if (length(cresults)) {
                   escape = F,
                   filter = 'top',
                   extensions = c("Buttons"),
-                  options = list(order = list(7, "desc"), 
+                  options = list(order = list(8, "desc"), 
                                  dom = "Bfrtip", 
                                  buttons = list('copy',
                                               list(extend = 'collection', 

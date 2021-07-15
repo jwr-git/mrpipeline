@@ -20,6 +20,9 @@ QCReport <- setRefClass("QCReport",
                                       pleioresults = "data.frame",
                                       steigerresults = "data.frame",
                                       cresults = "data.frame",
+                                      otresults = "data.frame",
+                                      dgidbresults = "data.frame",
+                                      dgidbdrugs = "data.frame",
                                       bonferroni = "numeric",
                                       plots = "data.frame",
                                       raw.plots = "list"),
@@ -100,6 +103,34 @@ QCReport <- setRefClass("QCReport",
                                                     chrpos = character(),
                                                     plot = character()
                             )
+                            otresults <<- data.frame(id1 = character(),
+                                                     id2 = character(),
+                                                     name1 = character(),
+                                                     name2 = character(),
+                                                     overall.ot = integer(),
+                                                     literature.ot = integer(),
+                                                     rna_expression.ot = integer(),
+                                                     genetic_assoc.ot = integer(),
+                                                     somatic_mute.ot = integer(),
+                                                     known_drug.ot = integer(),
+                                                     animal_model.ot = integer(),
+                                                     affected_pathway.ot = integer()
+                            )
+                            dgidbresults <<- data.frame(id = character(),
+                                                        trait = character(),
+                                                        Druggable.Genome = logical(),
+                                                        Clinically.Actionable = logical(),
+                                                        Drug.Resistant = logical()
+                            )
+                            dgidbdrugs <<- data.frame(Interaction.Types = character(),
+                                                      Drug.Name = character(),
+                                                      CHEMBL.ID = character(),
+                                                      Sources = character(),
+                                                      PMIDs = character(),
+                                                      Score = numeric(),
+                                                      trait = character(),
+                                                      id = character()
+                            )
                             plots <<- data.frame(id1 = character(),
                                                  id2 = character(),
                                                  name1 = character(),
@@ -152,12 +183,24 @@ QCReport <- setRefClass("QCReport",
                           },
 
                           add_cresults = function(r) {
-                            "Adds colocalisation reuslts to data.frame"
+                            "Adds colocalisation results to data.frame"
                             cresults <<- rbind(cresults, r)
                           },
                           add_hresults = function(r) {
                             "Adds heterogeneity results to data.frame"
                             hetresults <<- rbind(hetresults, r)
+                          },
+                          add_otresults = function(r) {
+                            "Adds Open Targets results to data.frame"
+                            otresults <<- rbind(otresults, r)
+                          },
+                          add_dgidbresults = function(r) {
+                            "Adds DGIdb results to data.frame"
+                            dgidbresults <<- rbind(dgidbresults, r)
+                          },
+                          add_dgidbdrugs = function(r) {
+                            "Adds drugs from DGIdb to data.frame"
+                            dgidbdrugs <<- rbind(dgidbdrugs, r)
                           }
                         )
                         )
