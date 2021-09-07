@@ -53,12 +53,12 @@ default:
   # See: https://rdrr.io/github/MRCIEU/TwoSampleMR/man/harmonise_data.html
   harmonise_action: 1
   
-  # Path to Plink-formatted reference files. If "NULL"
+  # Path to Plink-formatted reference files. If "~" (null)
   # then all clumping will take place using the MR-Base
   # server, remotely
   bfile_path: ~
   
-  # Path to Plink bin. If "NULL" then all clumping will
+  # Path to Plink bin. If "~" (null) then all clumping will
   # take place on the MR-Base remote server
   plink_path: ~
   
