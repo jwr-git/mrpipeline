@@ -70,8 +70,11 @@ mr_pipeline <- function(ids1, ids2,
   #hret <- do_heterogeneity(dat, report)
 
   # Drug target-related
-  ot_res <- ot_linkage(id1, id2, report)
+  #ot_res <- ot_linkage(id1, id2, report)
   dgidb_linkage(id1, id2, report)
+  #clinvar_linkage(id1, id2, report)
+  epigdb_linkage(id1, id2, report)
+  intermine(id1, id2, report)
 
   # Where are we saving the reports?
   out_path <- conf$out_path
@@ -101,7 +104,7 @@ mr_pipeline <- function(ids1, ids2,
   # Main report file
   make_report(out_path, out_name, dat, report, conf)
 
-  return(list(dat, res, cres, report, id1, id2, ot_res))
+  return(list(dat, res, cres, report, id1, id2))
 }
 
 #' Annotates the data using given IDs

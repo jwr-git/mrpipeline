@@ -27,16 +27,16 @@ read_datasets <- function(id1, id2,
                       trait.exposure = id1$info$trait[i],
                       id.exposure = id1$info$trait[i])
 
-      # F-statistic
-      ret <- .calc_f_stat(dat, conf$f_cutoff)
-      dat <- ret[[1]]
-      rem.f.stat <- ret[[2]]
-
-      # Annotate
-      id1$annotate(id1$info$id[i], unique(dat$exposure))
-
       # Reporting
       if (length(dat)) {
+        # F-statistic
+        ret <- .calc_f_stat(dat, conf$f_cutoff)
+        dat <- ret[[1]]
+        rem.f.stat <- ret[[2]]
+
+        # Annotate
+        id1$annotate_ensg(id1$info$id[i], unique(dat$exposure))
+
         pre_clump <- nrow(dat)
 
         dat <- dplyr::mutate(dat,
@@ -64,6 +64,8 @@ read_datasets <- function(id1, id2,
       } else {
         dat <- NULL
 
+        warning("No SNPs selected for exposure: ", id1$info$trait[i])
+
         report$add_dataset(report$get_exposures_name(),
                            c(unique(dat$exposure),
                              id1$info$id[i],
@@ -82,39 +84,33 @@ read_datasets <- function(id1, id2,
                                               r2 = conf$clump_r2,
                                               kb = conf$clump_kb)
 
-      # Nothing extracted - remove ID and return
-      if (length(dat) < 1) {
-        id1$bad_id(id1$info$id[i])
-        return(NULL)
-      }
-
-      dat <- dat %>%
-        tidyr::separate(exposure, "exposure", sep = "\\|\\|", extra = "drop") %>%
-        dplyr::mutate(id.exposure = id1$info$trait[i])
-
-      dat$exposure <- trimws(dat$exposure)
-
-      if (!is.null(conf$bfile_path) & !is.null(conf$plink_path))
-      {
-        dat <- dplyr::mutate(dat,
-                             rsid = SNP,
-                             pval = pval.exposure) %>%
-          ieugwasr::ld_clump(clump_kb = conf$clump_kb,
-                             clump_r2 = conf$clump_r2,
-                             pop = conf$pop,
-                             bfile = conf$bfile_path,
-                             plink_bin = conf$plink_path)
-      }
-
-      # F-statistic
-      ret <- .calc_f_stat(dat, conf$f_cutoff)
-      dat <- ret[[1]]
-      rem.f.stat <- ret[[2]]
-
-      # Annotate
-      id1$annotate(id1$info$id[i], unique(dat$exposure))
-
       if (length(dat)) {
+        dat <- dat %>%
+          tidyr::separate(exposure, "exposure", sep = "\\|\\|", extra = "drop") %>%
+          dplyr::mutate(id.exposure = id1$info$trait[i])
+
+        dat$exposure <- trimws(dat$exposure)
+
+        if (!is.null(conf$bfile_path) & !is.null(conf$plink_path))
+        {
+          dat <- dplyr::mutate(dat,
+                               rsid = SNP,
+                               pval = pval.exposure) %>%
+            ieugwasr::ld_clump(clump_kb = conf$clump_kb,
+                               clump_r2 = conf$clump_r2,
+                               pop = conf$pop,
+                               bfile = conf$bfile_path,
+                               plink_bin = conf$plink_path)
+        }
+
+        # F-statistic
+        ret <- .calc_f_stat(dat, conf$f_cutoff)
+        dat <- ret[[1]]
+        rem.f.stat <- ret[[2]]
+
+        # Annotate
+        id1$annotate_ensg(id1$info$id[i], unique(dat$exposure))
+
         #f_plot(dat, report)
 
         report$add_dataset(report$get_exposures_name(),
@@ -128,6 +124,10 @@ read_datasets <- function(id1, id2,
                              nrow(dat),
                              1))
       } else {
+        dat <- NULL
+
+        warning("No SNPs selected for exposure: ", id1$info$trait[i])
+
         report$add_dataset(report$get_exposures_name(),
                            c(unique(dat$exposure),
                              id1$info$id[i],
@@ -159,6 +159,9 @@ read_datasets <- function(id1, id2,
         dplyr::mutate(id.outcome = id2$info$trait[i])
 
       if (length(dat)) {
+        # Annotate EFO
+        id2$annotate_efo(id2$info$trait[i], unique(dat$outcome))
+
         report$add_dataset(report$get_outcomes_name(),
                            c(unique(dat$outcome),
                              id2$info$id[i],
@@ -168,6 +171,8 @@ read_datasets <- function(id1, id2,
                              nrow(dat)))
       } else {
         dat <- NULL
+
+        warning("No SNPs selected for outcome: ", id2$info$trait[i])
 
         report$add_dataset(report$get_outcomes_name(),
                            c(unique(dat$outcome),
@@ -184,12 +189,12 @@ read_datasets <- function(id1, id2,
         tidyr::separate(outcome, "outcome", sep = "\\|\\|", extra = "drop") %>%
         dplyr::mutate(id.outcome = id2$info$trait[i])
 
-      dat$outcome <- trimws(dat$outcome)
-
-      # Annotate
-      id2$annotate(id2$info$id[i], unique(dat$outcome))
-
       if (length(dat)) {
+        dat$outcome <- trimws(dat$outcome)
+
+        # Annotate EFO
+        id2$annotate_efo(id2$info$trait[i], unique(dat$outcome))
+
         report$add_dataset(report$get_outcomes_name(),
                            c(unique(dat$outcome),
                              id2$info$id[i],
@@ -199,6 +204,10 @@ read_datasets <- function(id1, id2,
                              nrow(dat),
                              1))
       } else {
+        dat <- NULL
+
+        warning("No SNPs selected for outcome: ", id2$info$trait[i])
+
         report$add_dataset(report$get_exposures_name(),
                            c(unique(dat$outcome),
                              id2$info$id[i],
@@ -227,7 +236,7 @@ DatasetIDs <- setRefClass("DatasetIDs",
                         fields = list(info = "data.frame"),
                         methods = list(
                           initialise = function(ids) {
-                            info <<- dplyr::tibble(id = ids, trait = ids, filename = ids, good = T)
+                            info <<- dplyr::tibble(id = ids, trait = ids, filename = ids, ontology = ids, good = T)
                             info <<- info %>% dplyr::filter(duplicated(id) == F)
 
                             loc <- file.exists(ids)
@@ -236,13 +245,14 @@ DatasetIDs <- setRefClass("DatasetIDs",
                               info[loc,]$filename <<- file.path(info[loc,]$filename)
                               info[loc,]$trait <<- tools::file_path_sans_ext(basename(info[loc,]$filename))
                               info[loc,]$id <<- tools::file_path_sans_ext(basename(info[loc,]$filename))
+                              info[loc,]$ontology <<- tools::file_path_sans_ext(basename(info[loc,]$filename))
                             }
                           },
 
                           add_id = function(id, trait, filename) {
                             "Adds new ID with trait and filename"
                             info <<- info %>%
-                              tibble::add_row(id = id, trait = trait, filename = filename, good = rep(T, length(id)))
+                              tibble::add_row(id = id, trait = trait, filename = filename, ontology = trait, good = rep(T, length(id)))
                           },
 
                           bad_id = function(id) {
@@ -252,10 +262,15 @@ DatasetIDs <- setRefClass("DatasetIDs",
 
                           remove_bad_ids = function() {
                             "Removes those IDs from the data.frame which are 'bad'"
+                            bad <- info[info$good == F, ]
                             info <<- info[info$good == T, ]
+
+                            if (nrow(bad)) {
+                              warning("The following datasets were removed due to there being no SNPs present for analysis: ", paste(unique(bad$id), collapse=", "))
+                            }
                           },
 
-                          annotate = function(id, name) {
+                          annotate_ensg = function(id, name) {
                             "Annotates IDs, currently using biomaRt for ENSGs"
                             name <- fs::path_sanitize(name)
                             name_san <- stringr::str_extract(name, "ENSG[0-9]+")
@@ -269,9 +284,28 @@ DatasetIDs <- setRefClass("DatasetIDs",
                               } else {
                                 info[info$id == id, ]$trait <<- name
                               }
+
+                              info[info$id == id, ]$ontology <<- name_san
                             } else {
                               info[info$id == id, ]$trait <<- name
+                              info[info$id == id, ]$ontology <<- name
                             }
+                          },
+
+                          annotate_efo = function(id, name) {
+                            "Annotates EFO"
+                            disease <- iconv(name, from = 'UTF-8', to = 'ASCII//TRANSLIT')
+                            r <- try(epigraphdb::ontology_gwas_efo(disease, fuzzy = T, mode = "table"), silent = T)
+
+                            if (class(r) == "try-error") {
+                              efo <- name
+                            } else {
+                              efo <- r[r$r.score > 0.95,][1, ]$efo.id
+                              efo <- tail(strsplit(efo, "/", fixed = T)[[1]], n = 1)
+                            }
+
+                            info[info$id == id, ]$trait <<- name
+                            info[info$id == id, ]$ontology <<- efo
                           }
                         )
 )
@@ -288,8 +322,8 @@ DatasetIDs <- setRefClass("DatasetIDs",
   # I think it's fine to do this. tidyr::crossing does something similar but
   # renaming the cols is weird
 
-  df = data.frame(id.x = character(), trait.x = character(), filename.x = character(), good.x = logical(),
-                  id.y = character(), trait.y = character(), filename.y = character(), good.y = logical())
+  df = data.frame(id.x = character(), trait.x = character(), filename.x = character(), ontology.x = character(), good.x = logical(),
+                  id.y = character(), trait.y = character(), filename.y = character(), ontology.y = character(), good.y = logical())
   for (r1 in 1:nrow(id1$info))
   {
     for (r2 in 1:nrow(id2$info))
@@ -320,10 +354,10 @@ DatasetIDs <- setRefClass("DatasetIDs",
 
   # Just in case biomaRt is down, this would stop the entire pipeline
   tryCatch({
-    mart.gene <- useMart(biomart="ENSEMBL_MART_ENSEMBL",
-                        host="grch37.ensembl.org",
-                        path="/biomart/martservice",
-                        dataset="hsapiens_gene_ensembl")
+    mart.gene <- biomaRt::useMart(biomart="ENSEMBL_MART_ENSEMBL",
+                                  host="grch37.ensembl.org",
+                                  path="/biomart/martservice",
+                                  dataset="hsapiens_gene_ensembl")
   }, error = function(e_code) {
     warning("biomaRt is currently unavailable and so ENSG IDs will not be annotated.")
   })
@@ -338,6 +372,41 @@ DatasetIDs <- setRefClass("DatasetIDs",
                    filters = 'ensembl_gene_id',
                    values = ensg,
                    mart = mart.gene)
+
+  return(results)
+}
+
+.ensg_to_mgi <- function(ensg)
+{
+  if (!require("biomaRt"))
+  {
+    warning("biomaRt not found! To annotate ENSG IDs, the biomaRt package must be installed.")
+    return(NULL)
+  }
+
+  library(biomaRt)
+
+  mart.mouse <- NA
+  mart.human <- NA
+
+  # Just in case biomaRt is down, this would stop the entire pipeline
+  tryCatch({
+    mart.mouse <- useMart(biomart="ensembl",
+                          dataset="mmusculus_gene_ensembl")
+    mart.human <- useMart(biomart="ENSEMBL_MART_ENSEMBL",
+                          dataset="hsapiens_gene_ensembl")
+
+  }, error = function(e_code) {
+    warning("biomaRt is currently unavailable and so ENSG IDs will not be converted to mouse gene IDs.")
+  })
+
+  results <- biomaRt::getLDS(attributes = c("ensembl_gene_id"),
+                             filters = "ensembl_gene_id",
+                             values = ensg,
+                             mart = mart.human,
+                             attributesL = c("mgi_symbol", "mgi_id"),
+                             martL = mart.mouse,
+                             uniqueRows=T)
 
   return(results)
 }

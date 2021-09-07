@@ -23,6 +23,8 @@ QCReport <- setRefClass("QCReport",
                                       otresults = "data.frame",
                                       dgidbresults = "data.frame",
                                       dgidbdrugs = "data.frame",
+                                      epidbresults = "data.frame",
+                                      mouseresults = "data.frame",
                                       bonferroni = "numeric",
                                       plots = "data.frame",
                                       raw.plots = "list"),
@@ -131,6 +133,18 @@ QCReport <- setRefClass("QCReport",
                                                       trait = character(),
                                                       id = character()
                             )
+                            epidbresults <<- data.frame(pubmed_id = list(),
+                                                        gene.name = character(),
+                                                        lt.id = character(),
+                                                        lt.name = character(),
+                                                        lt.type = list(),
+                                                        st.predicate = character(),
+                                                        literature_count = integer(),
+                                                        id1 = character(),
+                                                        id2 = character()
+                            )
+                            mouseresults <<- data.frame(
+                            )
                             plots <<- data.frame(id1 = character(),
                                                  id2 = character(),
                                                  name1 = character(),
@@ -186,21 +200,34 @@ QCReport <- setRefClass("QCReport",
                             "Adds colocalisation results to data.frame"
                             cresults <<- rbind(cresults, r)
                           },
+
                           add_hresults = function(r) {
                             "Adds heterogeneity results to data.frame"
                             hetresults <<- rbind(hetresults, r)
                           },
+
                           add_otresults = function(r) {
                             "Adds Open Targets results to data.frame"
                             otresults <<- rbind(otresults, r)
                           },
+
                           add_dgidbresults = function(r) {
                             "Adds DGIdb results to data.frame"
                             dgidbresults <<- rbind(dgidbresults, r)
                           },
+
                           add_dgidbdrugs = function(r) {
                             "Adds drugs from DGIdb to data.frame"
                             dgidbdrugs <<- rbind(dgidbdrugs, r)
+                          },
+
+                          add_epidbresults = function(r) {
+                            "Adds literature evidence from EpigraphDB"
+                            epidbresults <<- rbind(epidbresults, r)
+                          },
+                          add_mouseresults = function(r) {
+                            "Adds evidence from mouse models from ..."
+                            mouseresults <<- rbind(mouseresults, r)
                           }
                         )
                         )

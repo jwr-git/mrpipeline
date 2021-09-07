@@ -71,17 +71,21 @@ colocres <- params$report$cresults %>%
                                    ifelse(H4 > conf$coloc_moderate_thres & nsnps > 50, "Moderate", "Weak"))) %>%
   dplyr::mutate(colocflag = ifelse(colocflag == "", "NA", colocflag))
 
-#dgidbres <- params$reports$dgidbresults %>%
-#  dplyr::select(id, Druggable.Genome, Clinically.Actionable, Drug.Resistant) %>%
-#  dplyr::rename(Drug.Genome = Druggable.Genome,
-#                Clin.Act = Clinically.Actionable) %>%
-#  dplyr::mutate(Drug.Genome = ifelse(Drug.Genome == T, "Y", "N"),
-#                Clin.Act = ifelse(Clin.Act == T, "Y", "N"),
-#                Drug.Resistant = ifelse(Drug.Resistant == T, "Y", "N"))
+dgidbres <- params$report$dgidbresults %>%
+  dplyr::select(id, Druggable.Genome, Clinically.Actionable, Drug.Resistant) %>%
+  dplyr::mutate(Ontologies = paste0(
+    ifelse(Druggable.Genome == T, "Drg.Gen", ""),
+    ifelse(Clinically.Actionable == T, "|Clin.Act", ""),
+    ifelse(Drug.Resistant == T, "|Drg.Res", "")
+  ))
+
+drugs <- params$report$dgidbdrugs %>%
+  dplyr::count(id)
 
 dplyr::left_join(mrres, steigerres, by = c("id.exposure", "id.outcome")) %>%
   dplyr::left_join(colocres, by = c("exposure", "outcome")) %>%
-#  dplyr::left_join(dgidbres, by = c("id.exposure" = "id")) %>%
+  dplyr::left_join(dgidbres[c("id", "Ontologies")], by = c("id.exposure" = "id")) %>%
+  dplyr::left_join(drugs, by = c("id.exposure" = "id")) %>%
   dplyr::select(-pval, -nsnps, -H4) %>%
   dplyr::rename(Exposure.ID = id.exposure,
                 Outcome.ID = id.outcome,
@@ -89,9 +93,11 @@ dplyr::left_join(mrres, steigerres, by = c("id.exposure", "id.outcome")) %>%
                 Outcome = outcome,
                 MR.Pass = mrflag,
                 Steiger.Pass = flag,
-                Coloc.Pass = colocflag) %>%
+                Coloc.Pass = colocflag,
+                Drugs.Count = n) %>%
   dplyr::mutate(Exposure = paste0("<a href='./traits/", Exposure, ".html'>", Exposure, "</a>")) %>%
   dplyr::mutate(Outcome = paste0("<a href='./traits/", Outcome, ".html'>", Outcome, "</a>")) %>%
+  dplyr::mutate(dplyr::across(Drugs.Count, ~tidyr::replace_na(., 0))) %>%
   dplyr::relocate(Exposure, Outcome,
                   Exposure.ID, Outcome.ID,
                   MR.Pass, Steiger.Pass, Coloc.Pass) %>%
@@ -129,99 +135,6 @@ dplyr::left_join(mrres, steigerres, by = c("id.exposure", "id.outcome")) %>%
 #                           c("darkgreen", "red")),
 #    fontWeight = DT::styleEqual("Y", "bold")
 #  )
-```
-
-# Overview of Drug Target Evidence
-
-## Open Targets Platform
-
-```{r ot-table}
-brks <- seq(from = 0, to = 1, by = 0.1)
-clrs <- round(seq(180, 40, length.out = length(brks) + 1), 0) %>%
-  {paste0("rgb(", ., ",", ., ",180)")}
-
-to_table <- params$report$otresults %>%
-  dplyr::select(-id1, -id2) %>%
-  dplyr::relocate(name2, .after = name1) %>%
-  dplyr::rename(Exposure = name1,
-                Outcome = name2,
-                Overall.Score = overall.ot,
-                Literature = literature.ot,
-                RNA.Expression = rna_expression.ot,
-                Genetic.Assoc = genetic_assoc.ot,
-                Somatic.Mutations = somatic_mute.ot,
-                Known.Drugs = known_drug.ot,
-                Animal.Model = animal_model.ot,
-                Affected.Pathways = affected_pathway.ot)
-
-to_table %>%
-  DT::datatable(rownames = F,
-                escape = F,
-                filter = 'top',
-                extensions = c("Buttons"),
-                options = list(order = list(2, "desc"), 
-                               dom = "Bfrtip", 
-                               buttons = list('copy',
-                                              list(extend = 'collection', 
-                                                   buttons = c('csv', 'excel'), 
-                                                   text = 'Download')))) %>%
-    DT::formatSignif(columns = c("Overall.Score", 
-                               "Literature", 
-                               "RNA.Expression", 
-                               "Genetic.Assoc",
-                               "Somatic.Mutations",
-                               "Known.Drugs",
-                               "Animal.Model",
-                               "Affected.Pathways"), 
-                   digits = 3) %>%
-  DT::formatStyle(names(to_table),
-                  background = DT::styleColorBar(range(0, 1), 'lightblue'),
-                  backgroundSize = '98% 88%',
-                  backgroundRepeat = 'no-repeat',
-                  backgroundPosition = 'center')
-```
-
-## Drug-Genome Interaction DB
-
-```{r dgidb-table}
-params$report$dgidbresults %>%
-  dplyr::select(-id) %>%
-  dplyr::rename(Trait = trait) %>%
-  dplyr::mutate(Druggable.Genome = ifelse(Druggable.Genome == T, "Yes", "No"),
-                Clinically.Actionable = ifelse(Clinically.Actionable == T, "Yes", "No"),
-                Drug.Resistant = ifelse(Drug.Resistant == T, "Yes", "No")) %>%
-  DT::datatable(rownames = F,
-                escape = F,
-                filter = 'top',
-                extensions = c("Buttons"),
-                options = list(order = list(0, "asc"),
-                               dom = "Bfrtip",
-                               buttons = list ('copy',
-                                               list(extend = 'collection',
-                                                    buttons = c('csv', 'excel'),
-                                                    text = 'Download')))) %>%
-  DT::formatStyle(
-    c("Druggable.Genome", "Clinically.Actionable", "Drug.Resistant"),
-    color = DT::styleEqual(c("Yes", "No"),
-                           c("darkgreen", "red")),
-    fontWeight = DT::styleEqual("Yes", "bold")
-  )
-```
-
-## Possible Drugs
-
-```{r dgidb-drugs}
-params$report$dgidbdrugs %>%
-  dplyr::select(-id) %>%
-  dplyr::rename(Trait = trait) %>%
-  DT::datatable(rownames = F,
-                filter = 'top',
-                extensions = c("Buttons"),
-                options = list(dom = "Bfrtip",
-                               buttons = list ('copy',
-                                               list(extend = 'collection',
-                                                    buttons = c('csv', 'excel'),
-                                                    text = 'Download'))))
 ```
 
 # Datasets
@@ -486,3 +399,129 @@ if (length(cresults)) {
   <li><code>H0-4</code>: Posterior probability for hypotheses 0 through 4.</li>
   <li><code>ChrPos</code>: Chromosome and position range used to extract SNPs for [colocalisation](https://mr-dictionary.mrcieu.ac.uk/term/colocalization/).</li>
 </ul>
+
+# Overview of Drug Target Evidence
+
+```{r ot-table}
+# brks <- seq(from = 0, to = 1, by = 0.1)
+# clrs <- round(seq(180, 40, length.out = length(brks) + 1), 0) %>%
+#   {paste0("rgb(", ., ",", ., ",180)")}
+# 
+# to_table <- params$report$otresults %>%
+#   dplyr::select(-id1, -id2) %>%
+#   dplyr::relocate(name2, .after = name1) %>%
+#   dplyr::rename(Exposure = name1,
+#                 Outcome = name2,
+#                 Overall.Score = overall.ot,
+#                 Literature = literature.ot,
+#                 RNA.Expression = rna_expression.ot,
+#                 Genetic.Assoc = genetic_assoc.ot,
+#                 Somatic.Mutations = somatic_mute.ot,
+#                 Known.Drugs = known_drug.ot,
+#                 Animal.Model = animal_model.ot,
+#                 Affected.Pathways = affected_pathway.ot)
+# 
+# to_table %>%
+#   DT::datatable(rownames = F,
+#                 escape = F,
+#                 filter = 'top',
+#                 extensions = c("Buttons"),
+#                 options = list(order = list(2, "desc"), 
+#                                dom = "Bfrtip", 
+#                                buttons = list('copy',
+#                                               list(extend = 'collection', 
+#                                                    buttons = c('csv', 'excel'), 
+#                                                    text = 'Download')))) %>%
+#     DT::formatSignif(columns = c("Overall.Score", 
+#                                "Literature", 
+#                                "RNA.Expression", 
+#                                "Genetic.Assoc",
+#                                "Somatic.Mutations",
+#                                "Known.Drugs",
+#                                "Animal.Model",
+#                                "Affected.Pathways"), 
+#                    digits = 3) %>%
+#   DT::formatStyle(names(to_table),
+#                   background = DT::styleColorBar(range(0, 1), 'lightblue'),
+#                   backgroundSize = '98% 88%',
+#                   backgroundRepeat = 'no-repeat',
+#                   backgroundPosition = 'center')
+```
+
+## Literature Evidence
+
+Evidence from the literature collected by EpigraphDB.
+
+```{r epigraphdb-table}
+to_table <- params$report$epidbresults
+to_table$pubmed_id <- lapply(to_table$pubmed_id, function(x) paste(lapply(unlist(x), function(y) pmid_to_link(y, hyperlink = T)), collapse = ", "))
+#to_table$pubmed_id <- gsub(",", ", ", to_table$pubmed_id)
+to_table %>%
+  dplyr::select(-id1, -id2, -lt.id, -lt.type, -literature_count) %>%
+  dplyr::relocate(c("gene.name", "st.predicate", "lt.name", "pubmed_id")) %>%
+  dplyr::rename(Gene = gene.name,
+                PMIDs = pubmed_id,
+                Outcome = lt.name,
+                Predicate = st.predicate) %>%
+  DT::datatable(rownames = F,
+                escape = F,
+                filter = 'top',
+                extensions = c("Buttons"),
+                options = list(order = list(0, "asc"),
+                               dom = "Bfrtip",
+                               buttons = list ('copy',
+                                               list(extend = 'collection',
+                                                    buttons = c('csv', 'excel'),
+                                                    text = 'Download'))))
+```
+
+`r if (all(is.na(params$report$dgidbresults))) { "\\begin{comment}" }`
+
+## Drug-Genome Interaction DB
+
+```{r dgidb-table}
+params$report$dgidbresults %>%
+  dplyr::select(-id) %>%
+  dplyr::rename(Trait = trait) %>%
+  dplyr::mutate(Druggable.Genome = ifelse(Druggable.Genome == T, "Yes", "No"),
+                Clinically.Actionable = ifelse(Clinically.Actionable == T, "Yes", "No"),
+                Drug.Resistant = ifelse(Drug.Resistant == T, "Yes", "No")) %>%
+  DT::datatable(rownames = F,
+                escape = F,
+                filter = 'top',
+                extensions = c("Buttons"),
+                options = list(order = list(0, "asc"),
+                               dom = "Bfrtip",
+                               buttons = list ('copy',
+                                               list(extend = 'collection',
+                                                    buttons = c('csv', 'excel'),
+                                                    text = 'Download')))) %>%
+  DT::formatStyle(
+    c("Druggable.Genome", "Clinically.Actionable", "Drug.Resistant"),
+    color = DT::styleEqual(c("Yes", "No"),
+                           c("darkgreen", "red")),
+    fontWeight = DT::styleEqual("Yes", "bold")
+  )
+```
+
+## Possible Drugs
+
+```{r dgidb-drugs}
+to_table <- params$report$dgidbdrugs
+to_table$PMIDs <- lapply(to_table$PMIDs, function(x) paste(lapply(unlist(x), function(y) pmid_to_link(y, hyperlink = T)), collapse = ", "))
+
+to_table %>%
+  dplyr::select(-id) %>%
+  dplyr::rename(Trait = trait) %>%
+  DT::datatable(rownames = F,
+                escape = T,
+                filter = 'top',
+                extensions = c("Buttons"),
+                options = list(dom = "Bfrtip",
+                               buttons = list ('copy',
+                                               list(extend = 'collection',
+                                                    buttons = c('csv', 'excel'),
+                                                    text = 'Download'))))
+```
+
+`r if (all(is.na(params$report$dgidbresults))) { "\\end{comment}" }`

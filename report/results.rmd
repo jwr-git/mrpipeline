@@ -372,49 +372,74 @@ if (length(cresults) && nrow(cresults) > 0) {
 
 This section contains evidence for the given target for each of the outcomes given. Evidence is collected from:
 
-## Open Targets
+## Literature Evidence
 
 ```{r ot-table}
-brks <- seq(from = 0, to = 1, by = 0.1)
-clrs <- round(seq(180, 40, length.out = length(brks) + 1), 0) %>%
-  {paste0("rgb(", ., ",", ., ",180)")}
+#brks <- seq(from = 0, to = 1, by = 0.1)
+#clrs <- round(seq(180, 40, length.out = length(brks) + 1), 0) %>%
+#  {paste0("rgb(", ., ",", ., ",180)")}
+#
+#to_table <-params$report$otresults[params$report$otresults$id1 == params$id.exposure, ] %>%
+#  dplyr::select(-id1, -id2) %>%
+#  dplyr::relocate(name2, .after = name1) %>%
+#  dplyr::rename(Exposure = name1,
+#                Outcome = name2,
+#                Overall.Score = overall.ot,
+#                Literature = literature.ot,
+#                RNA.Expression = rna_expression.ot,
+#                Genetic.Assoc = genetic_assoc.ot,
+#                Somatic.Mutations = somatic_mute.ot,
+#                Known.Drugs = known_drug.ot,
+#                Animal.Model = animal_model.ot,
+#                Affected.Pathways = affected_pathway.ot)
+#
+#to_table %>%
+#  DT::datatable(rownames = F,
+#                escape = F,
+#                filter = 'top',
+#                extensions = c("Buttons"),
+#                options = list(order = list(2, "desc"), 
+#                               dom = "Bfrtip", 
+#                               buttons = list('copy',
+#                                              list(extend = 'collection', 
+#                                                   buttons = c('csv', 'excel'), 
+#                                                   text = 'Download')))) %>%
+#    DT::formatSignif(columns = c("Overall.Score", 
+#                               "Literature", 
+#                               "RNA.Expression", 
+#                               "Genetic.Assoc",
+#                               "Somatic.Mutations",
+#                               "Known.Drugs",
+#                               "Animal.Model",
+#                               "Affected.Pathways"), 
+#                   digits = 3) #%>%
+#  #DT::formatStyle(names(to_table), backgroundColor = DT::styleInterval(brks, clrs))
+```
 
-to_table <-params$report$otresults[params$report$otresults$id1 == params$id.exposure, ] %>%
-  dplyr::select(-id1, -id2) %>%
-  dplyr::relocate(name2, .after = name1) %>%
-  dplyr::rename(Exposure = name1,
-                Outcome = name2,
-                Overall.Score = overall.ot,
-                Literature = literature.ot,
-                RNA.Expression = rna_expression.ot,
-                Genetic.Assoc = genetic_assoc.ot,
-                Somatic.Mutations = somatic_mute.ot,
-                Known.Drugs = known_drug.ot,
-                Animal.Model = animal_model.ot,
-                Affected.Pathways = affected_pathway.ot)
-
+```{r epigraphdb-table}
+to_table <- params$report$epidbresults[params$report$epidbresults$id1 == params$id.exposure, ]
+to_table$pubmed_id <- lapply(to_table$pubmed_id, function(x) paste(lapply(unlist(x), function(y) pmid_to_link(y, hyperlink = T)), collapse = ", "))
+#to_table$pubmed_id <- gsub(",", ", ", to_table$pubmed_id)
 to_table %>%
+  dplyr::select(-id1, -id2, -lt.id, -lt.type, -literature_count) %>%
+  dplyr::relocate(c("gene.name", "st.predicate", "lt.name", "pubmed_id")) %>%
+  dplyr::rename(Gene = gene.name,
+                PMIDs = pubmed_id,
+                Outcome = lt.name,
+                Predicate = st.predicate) %>%
   DT::datatable(rownames = F,
                 escape = F,
                 filter = 'top',
                 extensions = c("Buttons"),
-                options = list(order = list(2, "desc"), 
-                               dom = "Bfrtip", 
-                               buttons = list('copy',
-                                              list(extend = 'collection', 
-                                                   buttons = c('csv', 'excel'), 
-                                                   text = 'Download')))) %>%
-    DT::formatSignif(columns = c("Overall.Score", 
-                               "Literature", 
-                               "RNA.Expression", 
-                               "Genetic.Assoc",
-                               "Somatic.Mutations",
-                               "Known.Drugs",
-                               "Animal.Model",
-                               "Affected.Pathways"), 
-                   digits = 3) #%>%
-  #DT::formatStyle(names(to_table), backgroundColor = DT::styleInterval(brks, clrs))
+                options = list(order = list(0, "asc"),
+                               dom = "Bfrtip",
+                               buttons = list ('copy',
+                                               list(extend = 'collection',
+                                                    buttons = c('csv', 'excel'),
+                                                    text = 'Download'))))
 ```
+
+`r if (all(is.na(params$report$dgidbresults))) { "\\begin{comment}" }`
 
 ## Drug-Genome Interaction DB
 
@@ -443,3 +468,35 @@ colourise <- function(type) {
 
 The Drug-Genome Interaction DB (DGIdB) collates evidence relevant to drug discovery efforts, for example, by categorising targets with ontology such as "part of the druggable genome", with the aim of improving and aiding drug discovery efforts. This section provides details on the three main ontologies.
 
+```{r dgidb-drugs}
+to_table <- params$report$dgidbdrugs[params$report$dgidbdrugs$id == params$id.exposure, ]
+to_table$PMIDs <- lapply(to_table$PMIDs, function(x) paste(lapply(unlist(x), function(y) pmid_to_link(y, hyperlink = T)), collapse = ", "))
+
+to_table %>%
+  dplyr::select(-id) %>%
+  dplyr::rename(Trait = trait) %>%
+  DT::datatable(rownames = F,
+                escape = T,
+                filter = 'top',
+                extensions = c("Buttons"),
+                options = list(dom = "Bfrtip",
+                               buttons = list ('copy',
+                                               list(extend = 'collection',
+                                                    buttons = c('csv', 'excel'),
+                                                    text = 'Download'))))
+```
+
+`r if (all(is.na(params$report$dgidbresults))) { "\\end{comment}" }`
+
+```{r mouse}
+params$report$mouseresults %>%
+  DT::datatable(rownames = F,
+                escape = T,
+                filter = 'top',
+                extensions = c("Buttons"),
+                options = list(dom = "Bfrtip",
+                               buttons = list ('copy',
+                                               list(extend = 'collection',
+                                                    buttons = c('csv', 'excel'),
+                                                    text = 'Download'))))
+```
