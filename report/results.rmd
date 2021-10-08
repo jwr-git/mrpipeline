@@ -270,7 +270,7 @@ Plots shown here include scatter and forest plots of results, if they are genera
 Forest plot showing the MR results for each outcome.
 
 ```{r forest-plot, echo = F, message = F, warning = F, dpi=400, fig.width=12, fig.height=6}
-if (exists("raw.plots")) {
+if (exists("raw.plots") & "forest" %in% plots$type) {
   grid.newpage()
   grid.draw(raw.plots[[as.integer(rownames(plots[plots$type == "forest", ]))]])
 }
@@ -288,7 +288,7 @@ grid.newpage()
 
 ## PheWAS-like Plot {.tabset}
 ```{r phewas-plot, echo = F, message = F, warning = F, results = F}
-if (exists("raw.plots")) {
+if (exists("raw.plots") & "phewas" %in% plots$type) {
   raw.plots[as.integer(rownames(plots[plots$type == "phewas", ]))]
 }
 ```
@@ -417,26 +417,28 @@ This section contains evidence for the given target for each of the outcomes giv
 ```
 
 ```{r epigraphdb-table}
-to_table <- params$report$epidbresults[params$report$epidbresults$id1 == params$id.exposure, ]
-to_table$pubmed_id <- lapply(to_table$pubmed_id, function(x) paste(lapply(unlist(x), function(y) pmid_to_link(y, hyperlink = T)), collapse = ", "))
-#to_table$pubmed_id <- gsub(",", ", ", to_table$pubmed_id)
-to_table %>%
-  dplyr::select(-id1, -id2, -lt.id, -lt.type, -literature_count) %>%
-  dplyr::relocate(c("gene.name", "st.predicate", "lt.name", "pubmed_id")) %>%
-  dplyr::rename(Gene = gene.name,
-                PMIDs = pubmed_id,
-                Outcome = lt.name,
-                Predicate = st.predicate) %>%
-  DT::datatable(rownames = F,
-                escape = F,
-                filter = 'top',
-                extensions = c("Buttons"),
-                options = list(order = list(0, "asc"),
-                               dom = "Bfrtip",
-                               buttons = list ('copy',
-                                               list(extend = 'collection',
-                                                    buttons = c('csv', 'excel'),
-                                                    text = 'Download'))))
+if (!any(is.null(params$report$epidbresults)) & nrow(params$report$epidbresults) > 0) {
+  to_table <- params$report$epidbresults[params$report$epidbresults$id1 == params$id.exposure, ]
+  to_table$pubmed_id <- lapply(to_table$pubmed_id, function(x) paste(lapply(unlist(x), function(y) pmid_to_link(y, hyperlink = T)), collapse = ", "))
+  #to_table$pubmed_id <- gsub(",", ", ", to_table$pubmed_id)
+  to_table %>%
+    dplyr::select(-id1, -id2, -lt.id, -lt.type, -literature_count) %>%
+    dplyr::relocate(c("gene.name", "st.predicate", "lt.name", "pubmed_id")) %>%
+    dplyr::rename(Gene = gene.name,
+                  PMIDs = pubmed_id,
+                  Outcome = lt.name,
+                  Predicate = st.predicate) %>%
+    DT::datatable(rownames = F,
+                  escape = F,
+                  filter = 'top',
+                  extensions = c("Buttons"),
+                  options = list(order = list(0, "asc"),
+                                 dom = "Bfrtip",
+                                 buttons = list ('copy',
+                                                 list(extend = 'collection',
+                                                      buttons = c('csv', 'excel'),
+                                                      text = 'Download'))))
+}
 ```
 
 `r if (all(is.na(params$report$dgidbresults))) { "\\begin{comment}" }`

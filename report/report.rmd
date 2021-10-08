@@ -453,26 +453,28 @@ if (length(cresults)) {
 Evidence from the literature collected by EpigraphDB.
 
 ```{r epigraphdb-table}
-to_table <- params$report$epidbresults
-to_table$pubmed_id <- lapply(to_table$pubmed_id, function(x) paste(lapply(unlist(x), function(y) pmid_to_link(y, hyperlink = T)), collapse = ", "))
-#to_table$pubmed_id <- gsub(",", ", ", to_table$pubmed_id)
-to_table %>%
-  dplyr::select(-id1, -id2, -lt.id, -lt.type, -literature_count) %>%
-  dplyr::relocate(c("gene.name", "st.predicate", "lt.name", "pubmed_id")) %>%
-  dplyr::rename(Gene = gene.name,
-                PMIDs = pubmed_id,
-                Outcome = lt.name,
-                Predicate = st.predicate) %>%
-  DT::datatable(rownames = F,
-                escape = F,
-                filter = 'top',
-                extensions = c("Buttons"),
-                options = list(order = list(0, "asc"),
-                               dom = "Bfrtip",
-                               buttons = list ('copy',
-                                               list(extend = 'collection',
-                                                    buttons = c('csv', 'excel'),
-                                                    text = 'Download'))))
+if (!any(is.null(params$report$epidbresults)) & nrow(params$report$epidbresults) > 0) {
+  to_table <- params$report$epidbresults
+  to_table$pubmed_id <- lapply(to_table$pubmed_id, function(x) paste(lapply(unlist(x), function(y) pmid_to_link(y, hyperlink = T)), collapse = ", "))
+  #to_table$pubmed_id <- gsub(",", ", ", to_table$pubmed_id)
+  to_table %>%
+    dplyr::select(-id1, -id2, -lt.id, -lt.type, -literature_count) %>%
+    dplyr::relocate(c("gene.name", "st.predicate", "lt.name", "pubmed_id")) %>%
+    dplyr::rename(Gene = gene.name,
+                  PMIDs = pubmed_id,
+                  Outcome = lt.name,
+                  Predicate = st.predicate) %>%
+    DT::datatable(rownames = F,
+                  escape = F,
+                  filter = 'top',
+                  extensions = c("Buttons"),
+                  options = list(order = list(0, "asc"),
+                                 dom = "Bfrtip",
+                                 buttons = list ('copy',
+                                                 list(extend = 'collection',
+                                                      buttons = c('csv', 'excel'),
+                                                      text = 'Download'))))
+}
 ```
 
 `r if (all(is.na(params$report$dgidbresults))) { "\\begin{comment}" }`

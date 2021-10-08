@@ -32,7 +32,7 @@ default:
   f_cutoff: 10
   
   # Clumping r2 threshold for removal of SNPs in LD
-  clump_r2: 0.001
+  clump_r2: 0.01
   
   # Clumping range for SNPs to be considered potentially
   # in LD with each other
@@ -56,11 +56,34 @@ default:
   # Path to Plink-formatted reference files. If "~" (null)
   # then all clumping will take place using the MR-Base
   # server, remotely
+  # NB: Can only be used on non-Windows machines
   bfile_path: ~
   
   # Path to Plink bin. If "~" (null) then all clumping will
   # take place on the MR-Base remote server
+  #
+  # Alternatively, if you wish to use the binaries in the
+  # https://github.com/explodecomputer/genetics.binaRies repo
+  # set this to:
+  # 	!expr gwasvcf::set_plink()
+  # NB: Can only be used on non-Windows machines
   plink_path: ~
+  
+  # Path to tagging variants file for use in local proxy searches
+  # with the gwasvcf file.
+  # For more information on how to build/use this, see:
+  # https://mrcieu.github.io/gwasvcf/articles/guide.html#compiling-a-list-of-tagging-variants-1
+  dbfile_path: ~
+  
+  # Path to bcf tools. If "~" (null) then bcf tools will not
+  # be used and operations with (GWAS) vcf files may take longer.
+  #
+  # Alternatively, if you wish to use the binaries in the
+  # https://github.com/explodecomputer/genetics.binaRies repo
+  # set this to:
+  # 	!expr gwasvcf::set_bcftools()
+  # NB: Can only be used on non-Windows machines
+  bcf_path: ~
   
   # Whether to use the second-term Taylor approximation of the SE
   # for the Wald ratio method or not.

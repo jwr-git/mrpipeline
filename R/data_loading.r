@@ -154,7 +154,26 @@ read_datasets <- function(id1, id2,
     # Is local vcf file? Load from there
     if (file.exists(f))
     {
-      dat <- gwasvcf::query_gwas(vcf = VariantAnnotation::readVcf(f), rsid = rsids) %>%
+      dat <- NULL
+
+      if (conf$proxies == TRUE) {
+        if (!is.null(conf$bfile_path)) {
+          dat <- gwasvcf::query_gwas(vcf = VariantAnnotation::readVcf(f),
+                                     proxies = "yes", bfile = conf$bfile_path,
+                                     rsid = rsids)
+        }
+        else if (!is.null(conf$dbfile_path)) {
+          dat <- gwasvcf::query_gwas(vcf = VariantAnnotation::readVcf(f),
+                                     proxies = "yes", dbfile = conf$dbfile_path,
+                                     rsid = rsids)
+        }
+      }
+
+      if (is.null(dat)) {
+        dat <- gwasvcf::query_gwas(vcf = VariantAnnotation::readVcf(f), rsid = rsids)
+      }
+
+      dat <- dat %>%
         gwasglue::gwasvcf_to_TwoSampleMR("outcome") %>%
         dplyr::mutate(id.outcome = id2$info$trait[i])
 
@@ -185,11 +204,13 @@ read_datasets <- function(id1, id2,
     } else
     {
       # From OpenGWAS
-      dat <- TwoSampleMR::extract_outcome_data(rsids, id2$info$id[i], proxies = conf$proxies) %>%
-        tidyr::separate(outcome, "outcome", sep = "\\|\\|", extra = "drop") %>%
-        dplyr::mutate(id.outcome = id2$info$trait[i])
+      dat <- TwoSampleMR::extract_outcome_data(rsids, id2$info$id[i], proxies = conf$proxies)
 
       if (length(dat)) {
+        dat <- dat %>%
+          tidyr::separate(outcome, "outcome", sep = "\\|\\|", extra = "drop") %>%
+          dplyr::mutate(id.outcome = id2$info$trait[i])
+
         dat$outcome <- trimws(dat$outcome)
 
         # Annotate EFO
@@ -208,7 +229,7 @@ read_datasets <- function(id1, id2,
 
         warning("No SNPs selected for outcome: ", id2$info$trait[i])
 
-        report$add_dataset(report$get_exposures_name(),
+        report$add_dataset(report$get_outcomes_name(),
                            c(unique(dat$outcome),
                              id2$info$id[i],
                              id2$info$trait[i],
@@ -223,6 +244,12 @@ read_datasets <- function(id1, id2,
     return(dat)
   }, mc.cores = conf$cores) %>%
     dplyr::bind_rows()
+
+  # Standardise outcome data
+  if (!"proxy.outcome" %in% names(outcome_dat)) {
+    outcome_dat$proxy.outcome <- F
+    outcome_dat$proxy_snp.outcome <- ""
+  }
 
   dat <- TwoSampleMR::harmonise_data(exposure_dat, outcome_dat, action = conf$harmonise_action)
   return(dat)
@@ -279,7 +306,7 @@ DatasetIDs <- setRefClass("DatasetIDs",
                             if (!is.na(name_san)) {
                               hgnc <- .ensg_to_name(name_san)
 
-                              if (length(hgnc)) {
+                              if (!is.na(hgnc) & nrow(hgnc)) {
                                 info[info$id == id, ]$trait <<- hgnc$hgnc_symbol
                               } else {
                                 info[info$id == id, ]$trait <<- name
@@ -353,7 +380,7 @@ DatasetIDs <- setRefClass("DatasetIDs",
   mart.gene <- NA
 
   # Just in case biomaRt is down, this would stop the entire pipeline
-  tryCatch({
+  attempt <- tryCatch({
     mart.gene <- biomaRt::useMart(biomart="ENSEMBL_MART_ENSEMBL",
                                   host="grch37.ensembl.org",
                                   path="/biomart/martservice",
@@ -362,10 +389,8 @@ DatasetIDs <- setRefClass("DatasetIDs",
     warning("biomaRt is currently unavailable and so ENSG IDs will not be annotated.")
   })
 
-  if (exists("mart.gene")) {
-    if (class(mart.gene) != "Mart") {
-      return(NULL)
-    }
+  if (inherits(attempt, "error")) {
+    return(NA)
   }
 
   results <- getBM(attributes=c('ensembl_gene_id', 'hgnc_symbol'),

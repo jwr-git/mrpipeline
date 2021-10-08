@@ -93,6 +93,50 @@
   return(res)
 }
 
+.ivw_delta <- function(dat)
+{
+  nsnps <- nrow(dat)
+  psi <- 0
+
+  robust.summary <- summary(robustbase::lmrob(dat$beta.outcome ~ dat$beta.exposure - 1, weights = (dat$se.outcome^2 + dat$beta.outcome^2*dat$se.exposure^2/dat$beta.exposure^2-2*psi*dat$beta.outcome*dat$se.exposure*dat$se.outcome/dat$beta.exposure)^-1,  k.max = 500, maxit.scale = 500))
+  IVWbeta <- robust.summary$coef[1]
+  IVWse <- robust.summary$coef[1,2] / min(robust.summary$sigma, 1)
+  pval <- 2 * pnorm(-abs(IVWbeta / IVWse))
+
+  #omega <- sqrt(dat$se.outcome ** 2 + dat$beta.outcome ** 2 * dat$se.exposure ** 2 / dat$beta.exposure ** 2) %o%
+  #  sqrt(dat$se.outcome ** 2 + dat$beta.outcome ** 2 * dat$se.exposure ** 2 / dat$beta.exposure ** 2)
+
+  #omega_s <- solve(omega)
+
+  #IVWbeta <- as.numeric(solve(t(dat$beta.exposure) %*% omega_s %*% dat$beta.exposure)
+  #                      * t(dat$beta.exposure) %*% omega_s %*% dat$beta.outcome)
+
+  # Fixed effect error
+  #IVWse <- sqrt(solve(t(dat$beta.exposure) %*% omega_s %*% dat$beta.exposure))
+
+  # Random effect error
+  #rse <- dat$beta.outcome - IVWbeta * dat$beta.exposure
+  #IVWse <- sqrt(solve(t(dat$beta.exposure) %*% omega_s %*% dat$beta.exposure)) *
+  #  max(sqrt(t(rse) %*% omega_s %*% rse / (nsnps - 1)), 1)
+
+  #pval <- 2 * pnorm(-abs(IVWbeta / IVWse))
+
+  res <- data.frame(
+    id.exposure = dat$id.exposure[1],
+    id.outcome = dat$id.outcome[1],
+    outcome = dat$outcome[1],
+    exposure = dat$exposure[1],
+    method = "Inverse variance weighted",
+    nsnp = nsnps,
+    b = IVWbeta,
+    se = IVWse,
+    pval = pval
+  )
+
+  return(res)
+
+}
+
 #' Runs Mendelian randomisation and related analyses, including heterogeneity,
 #' Steiger filtering and pleiotropy analyses.
 #' Also generates a number of plots, e.g. volcano plots, for MR results.
@@ -108,11 +152,28 @@ do_mr <- function(dat, report, conf)
   {
     x <- subset(x1, mr_keep.exposure)
 
-    if (nrow(x) == 1 & conf$wr_taylor_approx == T) {
-      res <- .wr_taylor_approx(x)
-    }
-    else {
-      res <- TwoSampleMR::mr(x)
+    nsnps <- nrow(x)
+
+    # WR on all single SNPs
+    res <- lapply(1:nsnps, function(i)
+    {
+      with(x, .wr_taylor_approx(x[i, ]))
+    })
+    res <- do.call(rbind, res)
+
+    # IVW if applicable
+    if (nsnps > 1)
+    {
+      tryCatch(
+        expr = {
+          res_ <- .ivw_delta(x)
+          res <- rbind(res, res_)
+        },
+        error = function(e) {
+          message("Error encounted in IVW, no result for this will be given: ")
+          message(e)
+        }
+      )
     }
 
     res <- subset(res, !(is.na(b) & is.na(se) & is.na(pval)))
@@ -124,15 +185,12 @@ do_mr <- function(dat, report, conf)
   #  dplyr::group_map(~ mr_scatter_plot(.x, .y, dat, report), .keep = T)
 
   # Volcano plot of each SNPs' WR results
-  TwoSampleMR::mr_singlesnp(dat) %>%
-    TwoSampleMR::generate_odds_ratios() %>%
-    dplyr::filter(!startsWith(getElement(., "SNP"), "All")) %>%
-    dplyr::group_by(id.exposure) %>%
+  res[res$method == "Wald ratio", ] %>%
     dplyr::group_map(~ volcano_plot(.x, report), .keep = T)
 
   # PheWAS plot of MR results
   res %>%
-    dplyr::group_by(id.exposure) %>%
+    dplyr::group_by(id.outcome) %>%
     dplyr::group_map(~ phewas_plot(.x, report), .keep = T)
 
   # Forest plot of MR results

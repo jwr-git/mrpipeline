@@ -91,20 +91,20 @@ mr_pipeline <- function(ids1, ids2,
   for (id.exposure in id1$info$id)
   {
     trait.name <- id1$info[id1$info$id == id.exposure, ]$trait
-    make_results(out_path, out_name, report, conf, dat[dat$id.exposure == id.exposure, ], id.exposure, trait.name)
+    #make_results(out_path, out_name, report, conf, dat[dat$id.exposure == id.exposure, ], id.exposure, trait.name)
   }
 
   # Per-outcome report
   for (id.outcome in id2$info$id)
   {
     trait.name <- id2$info[id2$info$id == id.outcome, ]$trait
-    make_outcomes(out_path, out_name, report, dat[dat$id.outcome == id.outcome, ], id.outcome, trait.name)
+    #make_outcomes(out_path, out_name, report, dat[dat$id.outcome == id.outcome, ], id.outcome, trait.name)
   }
 
   # Main report file
-  make_report(out_path, out_name, dat, report, conf)
+  #make_report(out_path, out_name, dat, report, conf)
 
-  return(list(dat, res, cres, report, id1, id2))
+  return(list(dat, res, cres, report, id1, id2, conf))
 }
 
 #' Annotates the data using given IDs
@@ -151,20 +151,62 @@ validate_config <- function(conf)
     conf$pop <- "EUR"
   }
 
+  # LD-related
+  if (Sys.info()['sysname'] == "Windows"
+      & (!is.null(conf$dbfile_path)
+         | !is.null(conf$bfile_path)
+         | !is.null(conf$plink_path)
+         | !is.null(conf$bcf_path))
+      )
+    {
+    message("Many local LD-related functions require OSX or Unix to use. These have been disabled as you seem to be using Windows.")
+    conf$bfile_path <- NULL
+    conf$dbfile_path <- NULL
+    conf$plink_path <- NULL
+    conf$bcf_path <- NULL
+  }
+
+  if (!is.null(conf$dbfile_path)) {
+    if (!file.exists(conf$dbfile_path)) {
+      warning("Cannot access LD tagging database at: ", conf$dbfile_path, ".")
+      conf$dbfile_path <- NULL
+    }
+  }
+
   if (!is.null(conf$bfile_path)) {
-    if (file.exists(paste0(conf$bfile_path), ".bim")) {
-      warning("Cannot access Plink files at: ", conf$bfile_path, ". Did you include the file endings? Defaulting to NULL.")
+    if (!file.exists(paste0(conf$bfile_path), ".bim")) {
+      warning("Cannot access reference panel at: ", conf$bfile_path, ". Did you include the file endings? Local LD panel will not be used for any of these analyses.")
       conf$bfile_path <- NULL
       conf$plink_path <- NULL
     }
   }
 
   if (!is.null(conf$plink_path)) {
-    if (file.exists(paste0(conf$plink_path))) {
-      warning("Cannot access Plink at: ", conf$plink_path, ". Defaulting to NULL.")
+    if (!file.exists(paste0(conf$plink_path))) {
+      warning("Cannot access Plink at: ", conf$plink_path, ". Plink will not be used for any of these analyses.")
       conf$bfile_path <- NULL
       conf$plink_path <- NULL
     }
+  }
+
+  if (!is.null(conf$bcf_path)) {
+    if (conf$bcf_path == "") {
+      a <- requireNamespace("genetics.binaRies")
+      if (a) {
+        message("Path not provided, using binaries in the explodecomputer/genetics.binaRies package")
+        conf$bcftools <- genetics.binaRies::get_bcftools_binary()
+      }
+      else {
+        message("Provide a path to bcftools binary or run devtools::install_github('explodecomputer/genetics.binaRies')")
+      }
+    }
+  }
+
+  if (class(conf$proxies) != "NULL" & conf$proxies != 0) {
+    conf$proxies <- TRUE
+  }
+  else {
+    conf$proxies <- FALSE
   }
 
   return(conf)

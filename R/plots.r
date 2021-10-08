@@ -144,11 +144,11 @@ phewas_plot <- function(res, report)
     return()
   }
 
-  id <- unique(res[["id.exposure"]])
-  name <- unique(res[["exposure"]])
+  id <- unique(res[["id.outcome"]])
+  name <- unique(res[["outcome"]])
   res <- res[res$method %in% c("Wald ratio", "Inverse variance weighted"), ]
 
-  if (is.na(id) || !nrow(res)) {
+  if (is.na(id) || nrow(res) < 2) {
     return()
   }
 
@@ -162,8 +162,8 @@ phewas_plot <- function(res, report)
     ggplot2::ylab("-log10(P value)") +
     ggplot2::labs(size = "Standardised OR")
 
-  report$add_plot(list(id1 = id,
-                       id2 = NA,
+  report$add_plot(list(id1 = NA,
+                       id2 = id,
                        name1 = name,
                        name2 = "",
                        type = "phewas"),
