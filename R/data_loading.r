@@ -18,61 +18,26 @@ read_datasets <- function(id1, id2,
   {
     f <- id1$info$filename[i]
 
-    # Load locally from vcf
+    # Load locally from vcf or gwas OpenGWAS
+    # and convert to TwoSampleMR format ready for
+    # the rest of the analyses
     if (file.exists(f) & tools::file_ext(f) == "vcf")
     {
-      dat <- gwasvcf::query_gwas(vcf = VariantAnnotation::readVcf(f), pval = -log10(conf$p_cutoff)) %>%
-        gwasglue::gwasvcf_to_TwoSampleMR("exposure") %>%
-        dplyr::mutate(exposure = id1$info$trait[i],
-                      trait.exposure = id1$info$trait[i],
-                      id.exposure = id1$info$trait[i])
+      dat <- gwasvcf::query_gwas(vcf = VariantAnnotation::readVcf(f), pval = -log10(conf$p_cutoff))
 
-      # Reporting
-      if (length(dat)) {
-        # F-statistic
-        ret <- .calc_f_stat(dat, conf$f_cutoff)
-        dat <- ret[[1]]
-        rem.f.stat <- ret[[2]]
-
-        # Annotate
-        id1$annotate_ensg(id1$info$id[i], unique(dat$exposure))
-
-        pre_clump <- nrow(dat)
-
-        dat <- dplyr::mutate(dat,
-                             rsid = SNP,
-                             pval = pval.exposure) %>%
-          ieugwasr::ld_clump(clump_kb = conf$clump_kb,
-                             clump_r2 = conf$clump_r2,
-                             pop = conf$pop,
-                             bfile = conf$bfile_path,
-                             plink_bin = conf$plink_path)
-        #dat %<>% TwoSampleMR::clump_data(clump_kb = kb, clump_r2 = r2, pop = pop)
-
-        #f_plot(dat, report)
-
-        report$add_dataset(report$get_exposures_name(),
-                           c(unique(dat$exposure),
-                             id1$info$id[i],
-                             id1$info$trait[i],
-                             pre_clump,
-                             F,
-                             rem.f.stat,
-                             pre_clump - nrow(dat),
-                             nrow(dat),
-                             0))
-      } else {
-        dat <- NULL
-
+      if (nrow(dat) < 1) {
         warning("No SNPs selected for exposure: ", id1$info$trait[i])
-
         report$add_dataset(report$get_exposures_name(),
-                           c(unique(dat$exposure),
+                           c("",
                              id1$info$id[i],
                              id1$info$trait[i],
                              0,
                              F))
+        id1$bad_id(i)
+        return(NULL)
       }
+
+      dat <- dat %>% gwasglue::gwasvcf_to_TwoSampleMR("exposure")
     } else
     {
       # From OpenGWAS
@@ -84,63 +49,93 @@ read_datasets <- function(id1, id2,
                                               r2 = conf$clump_r2,
                                               kb = conf$clump_kb)
 
-      if (length(dat)) {
-        dat <- dat %>%
-          tidyr::separate(exposure, "exposure", sep = "\\|\\|", extra = "drop") %>%
-          dplyr::mutate(id.exposure = id1$info$trait[i])
-
-        dat$exposure <- trimws(dat$exposure)
-
-        if (!is.null(conf$bfile_path) & !is.null(conf$plink_path))
-        {
-          dat <- dplyr::mutate(dat,
-                               rsid = SNP,
-                               pval = pval.exposure) %>%
-            ieugwasr::ld_clump(clump_kb = conf$clump_kb,
-                               clump_r2 = conf$clump_r2,
-                               pop = conf$pop,
-                               bfile = conf$bfile_path,
-                               plink_bin = conf$plink_path)
-        }
-
-        # F-statistic
-        ret <- .calc_f_stat(dat, conf$f_cutoff)
-        dat <- ret[[1]]
-        rem.f.stat <- ret[[2]]
-
-        # Annotate
-        id1$annotate_ensg(id1$info$id[i], unique(dat$exposure))
-
-        #f_plot(dat, report)
-
-        report$add_dataset(report$get_exposures_name(),
-                           c(unique(dat$exposure),
-                             id1$info$id[i],
-                             id1$info$trait[i],
-                             nrow(dat),
-                             ifelse(is.null(conf$bfile_path) & is.null(conf$plink_path), T, F),
-                             rem.f.stat,
-                             0,
-                             nrow(dat),
-                             1))
-      } else {
-        dat <- NULL
-
+      if (nrow(dat) < 1) {
         warning("No SNPs selected for exposure: ", id1$info$trait[i])
-
         report$add_dataset(report$get_exposures_name(),
                            c(unique(dat$exposure),
                              id1$info$id[i],
                              id1$info$trait[i],
                              0,
                              F))
+        id1$bad_id(i)
+        return(NULL)
+      }
+
+      # Some cleaning due to OpenGWAS format
+      dat <- dat %>%
+        tidyr::separate(exposure, "exposure", sep = "\\|\\|", extra = "drop")
+      dat$exposure <- trimws(dat$exposure)
+    }
+
+    # "Our" exposure name
+    dat$info.exposure <- id1$info$trait[i]
+
+    ############################################################################
+    # F-statistic test
+    ############################################################################
+    ret <- calc_f_stat(dat, conf$f_cutoff)
+    dat <- ret[[1]]
+    rem.f.stat <- ret[[2]]
+
+    if (nrow(dat) < 1) {
+      warning("No SNPs passed the F-statistic threshold for: ", id1$info$trait[i])
+      report$add_dataset(report$get_exposures_name(),
+                         c("",
+                           id1$info$id[i],
+                           id1$info$trait[i],
+                           0,
+                           F))
+      id1$bad_id(i)
+      return(NULL)
+    }
+
+    ############################################################################
+    # Local clumping, if specified
+    # Both datasets will be in TwoSampleMR format by this stage
+    ############################################################################
+    pre_clump <- nrow(dat)
+    if (!is.null(conf$bfile_path) & !is.null(conf$plink_path))
+    {
+      attempt <- try(dat <- dplyr::mutate(dat,
+                                          rsid = SNP,
+                                          pval = pval.exposure) %>%
+                       ieugwasr::ld_clump(clump_kb = conf$clump_kb,
+                                          clump_r2 = conf$clump_r2,
+                                          pop = conf$pop,
+                                          bfile = conf$bfile_path,
+                                          plink_bin = conf$plink_path), silent = T)
+
+      # Clumping failed?
+      if (class(attempt) == "try-error" | nrow(dat) < 1) {
+        warning("Error with clumping, or no SNPs retained thereafter for exposure: ", id1$info$trait[i])
+        report$add_dataset(report$get_exposures_name(),
+                           c("",
+                             id1$info$id[i],
+                             id1$info$trait[i],
+                             0,
+                             F))
+        id1$bad_id(i)
+        return(NULL)
       }
     }
+
+    report$add_dataset(report$get_exposures_name(),
+                       c(unique(dat$exposure),
+                         id1$info$id[i],
+                         id1$info$trait[i],
+                         nrow(dat),
+                         ifelse(file.exists(f) & tools::file_ext(f) == "vcf", F,
+                           ifelse(is.null(conf$bfile_path) & is.null(conf$plink_path), T, F)),
+                         rem.f.stat,
+                         pre_clump - nrow(dat),
+                         nrow(dat),
+                         !(file.exists(f) & tools::file_ext(f) == "vcf")))
 
     return (dat)
   }, mc.cores = conf$cores) %>%
     dplyr::bind_rows()
 
+  # Some tidying up again!
   # Remove those IDs with no data from future analyses
   id1$remove_bad_ids()
 
@@ -154,6 +149,8 @@ read_datasets <- function(id1, id2,
     # Is local vcf file? Load from there
     if (file.exists(f))
     {
+      # Set data as null so that we can tell if the local proxy search
+      # failed or did not run
       dat <- NULL
 
       if (conf$proxies == TRUE) {
@@ -169,87 +166,68 @@ read_datasets <- function(id1, id2,
         }
       }
 
+      # If this is null, then no local search for proxies
       if (is.null(dat)) {
         dat <- gwasvcf::query_gwas(vcf = VariantAnnotation::readVcf(f), rsid = rsids)
       }
 
-      dat <- dat %>%
-        gwasglue::gwasvcf_to_TwoSampleMR("outcome") %>%
-        dplyr::mutate(id.outcome = id2$info$trait[i])
-
-      if (length(dat)) {
-        # Annotate EFO
-        id2$annotate_efo(id2$info$trait[i], unique(dat$outcome))
-
-        report$add_dataset(report$get_outcomes_name(),
-                           c(unique(dat$outcome),
-                             id2$info$id[i],
-                             id2$info$trait[i],
-                             nrow(dat),
-                             0,
-                             nrow(dat)))
-      } else {
-        dat <- NULL
-
-        warning("No SNPs selected for outcome: ", id2$info$trait[i])
-
-        report$add_dataset(report$get_outcomes_name(),
-                           c(unique(dat$outcome),
-                             id2$info$id[i],
-                             id2$info$trait[i],
-                             0,
-                             0,
-                             0))
+      if (nrow(dat)) {
+        dat <- dat %>%
+          gwasglue::gwasvcf_to_TwoSampleMR("outcome")
       }
     } else
     {
       # From OpenGWAS
       dat <- TwoSampleMR::extract_outcome_data(rsids, id2$info$id[i], proxies = conf$proxies)
 
-      if (length(dat)) {
+      if (nrow(dat)) {
         dat <- dat %>%
-          tidyr::separate(outcome, "outcome", sep = "\\|\\|", extra = "drop") %>%
-          dplyr::mutate(id.outcome = id2$info$trait[i])
+          tidyr::separate(outcome, "outcome", sep = "\\|\\|", extra = "drop")
 
         dat$outcome <- trimws(dat$outcome)
-
-        # Annotate EFO
-        id2$annotate_efo(id2$info$trait[i], unique(dat$outcome))
-
-        report$add_dataset(report$get_outcomes_name(),
-                           c(unique(dat$outcome),
-                             id2$info$id[i],
-                             id2$info$trait[i],
-                             nrow(dat),
-                             nrow(dat[!is.na(dat$proxy.outcome) & dat$proxy.outcome == T,]),
-                             nrow(dat),
-                             1))
-      } else {
-        dat <- NULL
-
-        warning("No SNPs selected for outcome: ", id2$info$trait[i])
-
-        report$add_dataset(report$get_outcomes_name(),
-                           c(unique(dat$outcome),
-                             id2$info$id[i],
-                             id2$info$trait[i],
-                             0,
-                             F,
-                             0,
-                             0,
-                             0))
       }
     }
+
+    # No SNPs
+    if (nrow(dat) < 1) {
+      dat <- NULL
+
+      warning("No SNPs selected for outcome: ", id2$info$trait[i])
+
+      report$add_dataset(report$get_outcomes_name(),
+                         c(unique(dat$outcome),
+                           id2$info$id[i],
+                           id2$info$trait[i],
+                           0,
+                           F,
+                           0,
+                           0,
+                           0))
+    }
+
+
+    # Standardise outcome data
+    if (!"proxy.outcome" %in% names(dat)) {
+      dat$proxy.outcome <- F
+      dat$proxy_snp.outcome <- ""
+    }
+
+    # EFO linkage - do it here as we may need the exposure name from
+    # IEUGWAS DB if data are extracted from there
+    id2$annotate_efo(id2$info$trait[i], unique(dat$outcome))
+
+    report$add_dataset(report$get_outcomes_name(),
+                       c(unique(dat$outcome),
+                         id2$info$id[i],
+                         id2$info$trait[i],
+                         nrow(dat),
+                         nrow(dat[!is.na(dat$proxy.outcome) & dat$proxy.outcome == T,]),
+                         nrow(dat),
+                         1))
 
     return(dat)
   }, mc.cores = conf$cores) %>%
     dplyr::bind_rows()
-
-  # Standardise outcome data
-  if (!"proxy.outcome" %in% names(outcome_dat)) {
-    outcome_dat$proxy.outcome <- F
-    outcome_dat$proxy_snp.outcome <- ""
-  }
 
   dat <- TwoSampleMR::harmonise_data(exposure_dat, outcome_dat, action = conf$harmonise_action)
   return(dat)
@@ -297,34 +275,32 @@ DatasetIDs <- setRefClass("DatasetIDs",
                             }
                           },
 
-                          annotate_ensg = function(id, name) {
+                          annotate_ensg = function() {
                             "Annotates IDs, currently using biomaRt for ENSGs"
-                            name <- fs::path_sanitize(name)
-                            name_san <- stringr::str_extract(name, "ENSG[0-9]+")
+                            lookup <- info[grepl("eqtl-a-ENSG[0-9]+", info$id), ]$id
 
-                            # If trait name is ENSG, annotate these using biomaRt to hgnc_symbol
-                            if (!is.na(name_san)) {
-                              hgnc <- .ensg_to_name(name_san)
-
-                              if (!is.na(hgnc) & nrow(hgnc)) {
-                                info[info$id == id, ]$trait <<- hgnc$hgnc_symbol
-                              } else {
-                                info[info$id == id, ]$trait <<- name
-                              }
-
-                              info[info$id == id, ]$ontology <<- name_san
-                            } else {
-                              info[info$id == id, ]$trait <<- name
-                              info[info$id == id, ]$ontology <<- name
+                            if (length(lookup) < 1) {
+                              return()
                             }
+
+                            lookup_ensg <- stringr::str_extract(lookup, "ENSG[0-9]+")
+
+                            if (length(lookup_ensg)) {
+                              hgnc <- ensg_to_name(lookup_ensg)
+                              for (i in 1:nrow(hgnc)) {
+                                info[grepl(paste0("eqtl-a-", hgnc[i, "ensembl_gene_id"]), info$id), ]$trait <<- hgnc[i, "hgnc_symbol"]
+                              }
+                            }
+
+                            info <<- info %>% dplyr::mutate(trait = ifelse(trait %in% "", id, trait))
                           },
 
                           annotate_efo = function(id, name) {
                             "Annotates EFO"
                             disease <- iconv(name, from = 'UTF-8', to = 'ASCII//TRANSLIT')
-                            r <- try(epigraphdb::ontology_gwas_efo(disease, fuzzy = T, mode = "table"), silent = T)
+                            attempt <- try(r <- epigraphdb::ontology_gwas_efo(disease, fuzzy = T, mode = "table"), silent = T)
 
-                            if (class(r) == "try-error") {
+                            if (inherits(attempt, "try-error")) {
                               efo <- name
                             } else {
                               efo <- r[r$r.score > 0.95,][1, ]$efo.id
@@ -367,15 +343,13 @@ DatasetIDs <- setRefClass("DatasetIDs",
 #' @param ensg Vector of or single character, ENSG IDs
 #'
 #' @return Vector of or single character, gene names
-.ensg_to_name <- function(ensg)
+ensg_to_name <- function(ensg)
 {
   if (!require("biomaRt"))
   {
     warning("biomaRt not found! To annotate ENSG IDs, the biomaRt package must be installed.")
-    return(NULL)
+    return(NA)
   }
-
-  library(biomaRt)
 
   mart.gene <- NA
 
@@ -406,24 +380,26 @@ DatasetIDs <- setRefClass("DatasetIDs",
   if (!require("biomaRt"))
   {
     warning("biomaRt not found! To annotate ENSG IDs, the biomaRt package must be installed.")
-    return(NULL)
+    return(NA)
   }
-
-  library(biomaRt)
 
   mart.mouse <- NA
   mart.human <- NA
 
   # Just in case biomaRt is down, this would stop the entire pipeline
-  tryCatch({
-    mart.mouse <- useMart(biomart="ensembl",
+  attempt <- tryCatch({
+    mart.mouse <- biomaRt::useMart(biomart="ensembl",
                           dataset="mmusculus_gene_ensembl")
-    mart.human <- useMart(biomart="ENSEMBL_MART_ENSEMBL",
+    mart.human <- biomaRt::useMart(biomart="ENSEMBL_MART_ENSEMBL",
                           dataset="hsapiens_gene_ensembl")
 
-  }, error = function(e_code) {
+  }, error = function(e) {
     warning("biomaRt is currently unavailable and so ENSG IDs will not be converted to mouse gene IDs.")
   })
+
+  if (inherits(attempt, "error")) {
+    return(NA)
+  }
 
   results <- biomaRt::getLDS(attributes = c("ensembl_gene_id"),
                              filters = "ensembl_gene_id",

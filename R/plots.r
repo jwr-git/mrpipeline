@@ -80,8 +80,8 @@ volcano_plot <- function(res, report)
     return()
   }
 
-  p <- ggplot2::ggplot(data = res, aes(x = b, y = -log10(p), label = outcome)) +
-    ggplot2::geom_point(aes(text = sprintf("SNP: %s", SNP)), size=2) +
+  p <- ggplot2::ggplot(data = res, aes(x = b, y = -log10(pval), label = outcome)) +
+    ggplot2::geom_point(aes(text = sprintf("SNP: %s", snp)), size=2) +
     #ggrepel::geom_label_repel(box.padding=0.35,
     #                 point.padding=0.5,
     #                 size=6,
@@ -300,6 +300,9 @@ forest_plot <- function(res, dat, report)
   #  return()
   #}
 
+  # Reverse order of res so that WR are first followed by IVW
+  res <- res[seq(dim(res)[1], 1), ]
+
   id <- unique(res[["id.exposure"]])
   name <- unique(res[["exposure"]])
 
@@ -312,7 +315,7 @@ forest_plot <- function(res, dat, report)
 
   # Build clean df
   toShow <- res
-  toShow <- toShow[c("exposure", "outcome", "method", "b", "se", "pval", "lo_ci", "up_ci")]
+  toShow <- toShow[c("exposure", "outcome", "method", "snp", "b", "se", "pval", "lo_ci", "up_ci")]
   toShow$estimate <- round(exp(toShow$b), nodigits)
   toShow$conf.low <- round(exp(toShow$lo_ci), nodigits)
   toShow$conf.high <- round(exp(toShow$up_ci), nodigits)
@@ -326,7 +329,9 @@ forest_plot <- function(res, dat, report)
   toShow$ci[is.na(toShow$b)] = ""
   toShow$estimate[is.na(toShow$b)] = 0
 
-  terms <- paste0(toShow$exposure, " | ", toShow$outcome, " | ", toShow$method)
+  terms <- ifelse(toShow$method == "Wald ratio",
+                  paste0(toShow$exposure, " | ", toShow$outcome, " | ", toShow$method, " | ", toShow$snp),
+                  paste0(toShow$exposure, " | ", toShow$outcome, " | ", toShow$method))
   coeffs <- res$b
   lower <- res$lo_ci
   upper <- res$up_ci

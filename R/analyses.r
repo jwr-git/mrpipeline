@@ -3,7 +3,7 @@
 #' @param dat A data.frame of data
 #'
 #' @return List of data.frame and integer
-.calc_f_stat <- function(dat, f_cutoff)
+calc_f_stat <- function(dat, f_cutoff)
 {
   full.f.stat <- T
 
@@ -71,7 +71,7 @@
 #' @param object Data.frame or vector
 #'
 #' @return Appended result
-.wr_taylor_approx <- function(dat)
+wr_taylor_approx <- function(dat)
 {
   b <- dat$beta.outcome / dat$beta.exposure
   se <- (dat$se.outcome ** 2 / dat$beta.exposure ** 2) + ((dat$beta.outcome ** 2 * dat$se.exposure ** 2) / (dat$beta.exposure ** 4))
@@ -85,6 +85,7 @@
     exposure = dat$exposure[1],
     method = "Wald ratio",
     nsnp = 1,
+    snp = unique(dat$SNP),
     b = b,
     se = se,
     pval = pval
@@ -93,14 +94,14 @@
   return(res)
 }
 
-.ivw_delta <- function(dat)
+ivw_delta <- function(dat)
 {
   nsnps <- nrow(dat)
   psi <- 0
 
-  robust.summary <- summary(robustbase::lmrob(dat$beta.outcome ~ dat$beta.exposure - 1, weights = (dat$se.outcome^2 + dat$beta.outcome^2*dat$se.exposure^2/dat$beta.exposure^2-2*psi*dat$beta.outcome*dat$se.exposure*dat$se.outcome/dat$beta.exposure)^-1,  k.max = 500, maxit.scale = 500))
-  IVWbeta <- robust.summary$coef[1]
-  IVWse <- robust.summary$coef[1,2] / min(robust.summary$sigma, 1)
+  summary <- summary(lm(dat$beta.outcome ~ dat$beta.exposure - 1, weights = (dat$se.outcome^2 + dat$beta.outcome^2*dat$se.exposure^2/dat$beta.exposure^2-2*psi*dat$beta.outcome*dat$se.exposure*dat$se.outcome/dat$beta.exposure)^-1))
+  IVWbeta <- summary$coef[1]
+  IVWse <- summary$coef[1,2] / min(summary$sigma, 1)
   pval <- 2 * pnorm(-abs(IVWbeta / IVWse))
 
   #omega <- sqrt(dat$se.outcome ** 2 + dat$beta.outcome ** 2 * dat$se.exposure ** 2 / dat$beta.exposure ** 2) %o%
@@ -128,13 +129,13 @@
     exposure = dat$exposure[1],
     method = "Inverse variance weighted",
     nsnp = nsnps,
+    snp = paste(dat$SNP, collapse = ", "),
     b = IVWbeta,
     se = IVWse,
     pval = pval
   )
 
   return(res)
-
 }
 
 #' Runs Mendelian randomisation and related analyses, including heterogeneity,
@@ -157,7 +158,7 @@ do_mr <- function(dat, report, conf)
     # WR on all single SNPs
     res <- lapply(1:nsnps, function(i)
     {
-      with(x, .wr_taylor_approx(x[i, ]))
+      with(x, wr_taylor_approx(x[i, ]))
     })
     res <- do.call(rbind, res)
 
@@ -166,7 +167,7 @@ do_mr <- function(dat, report, conf)
     {
       tryCatch(
         expr = {
-          res_ <- .ivw_delta(x)
+          res_ <- ivw_delta(x)
           res <- rbind(res, res_)
         },
         error = function(e) {
@@ -176,7 +177,9 @@ do_mr <- function(dat, report, conf)
       )
     }
 
-    res <- subset(res, !(is.na(b) & is.na(se) & is.na(pval)))
+    if (nrow(res) > 0) {
+      res <- subset(res, !(is.na(b) & is.na(se) & is.na(pval)))
+    }
   }) %>%
     TwoSampleMR::generate_odds_ratios()
 
@@ -185,8 +188,8 @@ do_mr <- function(dat, report, conf)
   #  dplyr::group_map(~ mr_scatter_plot(.x, .y, dat, report), .keep = T)
 
   # Volcano plot of each SNPs' WR results
-  res[res$method == "Wald ratio", ] %>%
-    dplyr::group_map(~ volcano_plot(.x, report), .keep = T)
+  #res[res$method == "Wald ratio", ] %>%
+  #  dplyr::group_map(~ volcano_plot(.x, report), .keep = T)
 
   # PheWAS plot of MR results
   res %>%
