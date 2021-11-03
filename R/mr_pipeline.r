@@ -18,15 +18,15 @@ mr_pipeline <- function(ids1, ids2,
   # Config file loading
   if (config_file != "") {
     # Attempt to load config from given path
-    conf <- try(config::get(file = config_file), silent = T)
+    attempt <- try(conf <- config::get(file = config_file), silent = T)
   }
 
-  if (exists("conf") == F) {
+  if (!exists("conf")) {
     message("Using default config file.")
-    conf <- try(config::get(system.file("config", "config.yml", package = "mrpipeline")), silent = T)
+    attempt <- try(conf <- config::get(file = system.file("data", "config.yml", package = "mrpipeline")), silent = T)
   }
 
-  if (class(conf) == "try-error" | exists("conf") == F) {
+  if (class(attempt) == "try-error" | !exists("conf")) {
     stop("No config file found -- has the default been moved or deleted?")
   }
 
@@ -51,6 +51,10 @@ mr_pipeline <- function(ids1, ids2,
   id2 <- DatasetIDs$new()
   id2$initFields()
   id2$initialise(ids2)
+
+  # Annotate some known IEUGWASdb IDs
+  id1$annotate_ensg()
+  id2$annotate_ensg()
 
   # Read datasets, format and harmonise in TwoSampleMR format
   dat <- read_datasets(id1, id2,
@@ -91,18 +95,18 @@ mr_pipeline <- function(ids1, ids2,
   for (id.exposure in id1$info$id)
   {
     trait.name <- id1$info[id1$info$id == id.exposure, ]$trait
-    #make_results(out_path, out_name, report, conf, dat[dat$id.exposure == id.exposure, ], id.exposure, trait.name)
+    make_results(out_path, out_name, report, conf, dat[dat$id.exposure == id.exposure, ], id.exposure, trait.name)
   }
 
   # Per-outcome report
   for (id.outcome in id2$info$id)
   {
     trait.name <- id2$info[id2$info$id == id.outcome, ]$trait
-    #make_outcomes(out_path, out_name, report, dat[dat$id.outcome == id.outcome, ], id.outcome, trait.name)
+    make_outcomes(out_path, out_name, report, dat[dat$id.outcome == id.outcome, ], id.outcome, trait.name)
   }
 
   # Main report file
-  #make_report(out_path, out_name, dat, report, conf)
+  make_report(out_path, out_name, dat, report, conf)
 
   return(list(dat, res, cres, report, id1, id2, conf))
 }

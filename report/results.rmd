@@ -73,7 +73,7 @@ if (nrow(plots)) {
 
 # Harmonised SNPs
 
-This table shows the SNPs included in the instrument after [harmonisation](https://mr-dictionary.mrcieu.ac.uk/term/harmonization/) with the outcome dataset(s).
+This table shows the SNPs included in the instrument after [harmonisation](https://mr-dictionary.mrcieu.ac.uk/term/harmonization/) with the outcome dataset(s). 
 
 ```{r exp-snps}
 if (length(dat) < 1 || nrow(dat) < 1) {
@@ -171,24 +171,22 @@ if (length(dat) < 1 || nrow(dat) < 1) {
 }
 ```
 
+<!--
+## Diagnostic plots -- shows only when there are multiple SNPs per exposure
+-->
+`r if (nrow(params$dat) <= nrow(unique(dat$outcome))) { "\\begin{comment}" }`
+
 # Diagnostic Plots
 
-```{r}
-if (nrow(params$dat) < 3) {
-  cat("No plots generated due to insufficient SNPs.")
-}
-```
-
-`r if (nrow(params$dat) < 3) { "\\begin{comment}" }`
+The following plots show how the exposure and outcome SNPs relate to one another. These graphs can therefore offer an qualitative inspection of the data when instruments consist of multiple SNPs.
 
 ## Z score plot
 
 A plot of Z score (beta / SE) against P value for each exposure SNP which can help detect potentially problematic SNPs. The shape of the graph should be parabolic, roughly of the form $y=x^{2}$, with potentially problematic SNPs lying outside of that curve. A curve of best fit is also provided as a rough aid if there are enough SNPs.
 
 ```{r f-plot, warning = F, dpi=300, fig.width=2, fig.height=2}
-plotly::ggplotly(automrpipeline::interactive_z_plot(params$dat))
+plotly::ggplotly(mrpipeline::interactive_z_plot(params$dat))
 ```
-`r if (nrow(params$dat) < 3) { "\\end{comment}" }`
 
 ## Scatter plots {.tabset}
 
@@ -199,7 +197,7 @@ plotlist <- htmltools::tagList() # Work around for print and plotly::ggplotly no
 j <- 0
 for (i in unique(dat$id.outcome)) {
   j <- j + 1
-  p <- automrpipeline::interactive_scatter_plot(params$dat, params$id.exposure, i)
+  p <- mrpipeline::interactive_scatter_plot(params$dat, params$id.exposure, i)
   if (!is.null(p)) {
     cat("  \n### ", unique(dat[dat$id.outcome == i,]$outcome), "  \n")
     plotlist[[j]] <- as.widget(plotly::ggplotly(p))
@@ -211,12 +209,21 @@ for (i in unique(dat$id.outcome)) {
 }
 ```
 
+`r if (nrow(params$dat) <= nrow(unique(dat$outcome))) { "\\end{comment}" }`
+
 <!--
-## SNP-Effects Forest plot
+## Main results from the MR analyses
 -->
 # MR Results
 
-Results for the main MR analyses ([Wald ratio]((https://mr-dictionary.mrcieu.ac.uk/term/wald-ratio/)) (WR) and [inverse variance weighted]((https://mr-dictionary.mrcieu.ac.uk/term/ivw/)) (IVW)) are given here. The WR method is performed on single-SNP instruments, whilst the IVW method is performed on everything else.
+Results for the main MR analyses ([Wald ratio]((https://mr-dictionary.mrcieu.ac.uk/term/wald-ratio/)) (WR) and [inverse variance weighted]((https://mr-dictionary.mrcieu.ac.uk/term/ivw/)) (IVW)) are given here. The WR method is performed on all constituent SNPs for each instrument, whilst the IVW method is performed on those instruments which consist of multiple SNPs.
+
+Steiger filtering results are also given, including the approximated variance explained (r2.exposure, r2.outcome), direction of effect (true when direction is from exposure to outcome, false vice versa), P value and a flag which simplifies the interpretation of the Steiger results:
+<ul>
+  <li> True, when direction is correctly orientated and P value < 0.05.
+  <li> False, when direction is incorrectly orientated and P value < 0.05.
+  <li> Unknown, when P value >= 0.05.
+</ul>
 
 ```{r results-mr, message = F, warning = F, echo = F}
 steiger <- params$report$steigerresults
@@ -261,22 +268,22 @@ results %>%
                    digits = 3)
 ```
 
-# Results Plots {.tabset}
+## Results Plots {.tabset}
 
 Plots shown here include scatter and forest plots of results, if they are generated (some may require many SNPs).
 
-## Forest Plot {.tabset}
+### Forest Plot {.tabset}
 
 Forest plot showing the MR results for each outcome.
 
 ```{r forest-plot, echo = F, message = F, warning = F, dpi=400, fig.width=12, fig.height=6}
-if (exists("raw.plots") & "forest" %in% plots$type) {
-  grid.newpage()
-  grid.draw(raw.plots[[as.integer(rownames(plots[plots$type == "forest", ]))]])
-}
+#if (exists("raw.plots") & "forest" %in% plots$type) {
+#  grid.newpage()
+#  grid.draw(raw.plots[[as.integer(rownames(plots[plots$type == "forest", ]))]][[1]])
+#}
 ```
 
-## Volcano Plot {.tabset}
+### Volcano Plot {.tabset}
 
 Volcano plot of the individual SNP Wald ratios.
 
@@ -286,11 +293,11 @@ mrpipeline::interactive_volcano_plot(dat[dat$id.exposure == id.exposure,])
 grid.newpage()
 ```
 
-## PheWAS-like Plot {.tabset}
+### PheWAS-like Plot {.tabset}
 ```{r phewas-plot, echo = F, message = F, warning = F, results = F}
-if (exists("raw.plots") & "phewas" %in% plots$type) {
-  raw.plots[as.integer(rownames(plots[plots$type == "phewas", ]))]
-}
+#if (exists("raw.plots") & "phewas" %in% plots$type) {
+#  raw.plots[as.integer(rownames(plots[plots$type == "phewas", ]))]
+#}
 ```
 <!--
 ```{r scatter-plot2, echo = F, message = F, warning = F, results = "asis"}
@@ -471,34 +478,34 @@ colourise <- function(type) {
 The Drug-Genome Interaction DB (DGIdB) collates evidence relevant to drug discovery efforts, for example, by categorising targets with ontology such as "part of the druggable genome", with the aim of improving and aiding drug discovery efforts. This section provides details on the three main ontologies.
 
 ```{r dgidb-drugs}
-to_table <- params$report$dgidbdrugs[params$report$dgidbdrugs$id == params$id.exposure, ]
-to_table$PMIDs <- lapply(to_table$PMIDs, function(x) paste(lapply(unlist(x), function(y) pmid_to_link(y, hyperlink = T)), collapse = ", "))
+#to_table <- params$report$dgidbdrugs[params$report$dgidbdrugs$id == params$id.exposure, ]
+#to_table$PMIDs <- lapply(to_table$PMIDs, function(x) paste(lapply(unlist(x), function(y) pmid_to_link(y, hyperlink = T)), #collapse = ", "))
 
-to_table %>%
-  dplyr::select(-id) %>%
-  dplyr::rename(Trait = trait) %>%
-  DT::datatable(rownames = F,
-                escape = T,
-                filter = 'top',
-                extensions = c("Buttons"),
-                options = list(dom = "Bfrtip",
-                               buttons = list ('copy',
-                                               list(extend = 'collection',
-                                                    buttons = c('csv', 'excel'),
-                                                    text = 'Download'))))
+#to_table %>%
+#  dplyr::select(-id) %>%
+#  dplyr::rename(Trait = trait) %>%
+#  DT::datatable(rownames = F,
+#                escape = T,
+#                filter = 'top',
+#                extensions = c("Buttons"),
+#                options = list(dom = "Bfrtip",
+#                               buttons = list ('copy',
+#                                               list(extend = 'collection',
+#                                                    buttons = c('csv', 'excel'),
+#                                                    text = 'Download'))))
 ```
 
 `r if (all(is.na(params$report$dgidbresults))) { "\\end{comment}" }`
 
 ```{r mouse}
-params$report$mouseresults %>%
-  DT::datatable(rownames = F,
-                escape = T,
-                filter = 'top',
-                extensions = c("Buttons"),
-                options = list(dom = "Bfrtip",
-                               buttons = list ('copy',
-                                               list(extend = 'collection',
-                                                    buttons = c('csv', 'excel'),
-                                                    text = 'Download'))))
+#params$report$mouseresults %>%
+#  DT::datatable(rownames = F,
+#                escape = T,
+#                filter = 'top',
+#                extensions = c("Buttons"),
+#                options = list(dom = "Bfrtip",
+#                               buttons = list ('copy',
+#                                               list(extend = 'collection',
+#                                                    buttons = c('csv', 'excel'),
+#                                                    text = 'Download'))))
 ```
