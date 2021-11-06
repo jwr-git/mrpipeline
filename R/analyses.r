@@ -3,7 +3,7 @@
 #' @param dat A data.frame of data
 #'
 #' @return List of data.frame and integer
-calc_f_stat <- function(dat, f_cutoff)
+calc_f_stat <- function(dat, f_cutoff = 10, verbose = TRUE)
 {
   full.f.stat <- T
 
@@ -31,14 +31,16 @@ calc_f_stat <- function(dat, f_cutoff)
     dat$f.stat.exposure <- ifelse(dat$pve.exposure == -1, 0,
                                   ((dat$samplesize.exposure - length(unique(dat$SNP)) - 1) / length(unique(dat$SNP))) * (dat$pve.exposure / (1 - dat$pve.exposure)))
   } else {
-    message("Using approximate F-statistic as no allele frequency has been provided.")
+    .print_msg("Using approximate F-statistic as no allele frequency has been provided.", verbose)
     dat$f.stat.exposure <- dat$beta.exposure ** 2 / dat$se.exposure ** 2
   }
 
   rem.f.stat <- nrow(dat[dat$f.stat.exposure < f_cutoff, ])
-  dat <- dat[dat$f.stat.exposure >= f_cutoff & !is.na(dat$f.stat.exposure), ]
+  .print_msg(paste0("Amount of SNPs which did not meet threshold: ", rem.f.stat), verbose)
 
-  return(list(dat, rem.f.stat))
+  #dat <- dat[dat$f.stat.exposure >= f_cutoff & !is.na(dat$f.stat.exposure), ]
+
+  return(dat)
 }
 
 #' Calculates proportion of variance explained
@@ -71,7 +73,7 @@ calc_f_stat <- function(dat, f_cutoff)
 #' @param object Data.frame or vector
 #'
 #' @return Appended result
-wr_taylor_approx <- function(dat)
+.wr_taylor_approx <- function(dat)
 {
   b <- dat$beta.outcome / dat$beta.exposure
   se <- (dat$se.outcome ** 2 / dat$beta.exposure ** 2) + ((dat$beta.outcome ** 2 * dat$se.exposure ** 2) / (dat$beta.exposure ** 4))
@@ -94,7 +96,7 @@ wr_taylor_approx <- function(dat)
   return(res)
 }
 
-ivw_delta <- function(dat)
+.ivw_delta <- function(dat)
 {
   nsnps <- nrow(dat)
   psi <- 0
@@ -147,8 +149,17 @@ ivw_delta <- function(dat)
 #' @param conf config::config file of parameter
 #'
 #' @return A data.frame of MR results
-do_mr <- function(dat, report, conf)
+do_mr <- function(dat, f_cutoff = 10, verbose = TRUE)
 {
+  if (!is.null(f_cutoff)) {
+    if ("f.stat.exposure" %in% names(dat)) {
+      dat <- dat[dat$f.stat.exposure >= f_cutoff & !is.na(dat$f.stat.exposure), ]
+    } else {
+      .print_msg("F-statistic cut-off given but could not find column \"f.stat.exposure\". Calculating these now.", verbose = verbose)
+      dat <- calc_f_stat(dat, f_cutoff = f_cutoff, verbose = verbose)
+    }
+  }
+
   res <- plyr::ddply(dat, c("id.exposure", "id.outcome"), function(x1)
   {
     x <- subset(x1, mr_keep.exposure)
@@ -158,7 +169,7 @@ do_mr <- function(dat, report, conf)
     # WR on all single SNPs
     res <- lapply(1:nsnps, function(i)
     {
-      with(x, wr_taylor_approx(x[i, ]))
+      with(x, .wr_taylor_approx(x[i, ]))
     })
     res <- do.call(rbind, res)
 
@@ -167,7 +178,7 @@ do_mr <- function(dat, report, conf)
     {
       tryCatch(
         expr = {
-          res_ <- ivw_delta(x)
+          res_ <- .ivw_delta(x)
           res <- rbind(res, res_)
         },
         error = function(e) {
@@ -183,57 +194,15 @@ do_mr <- function(dat, report, conf)
   }) %>%
     TwoSampleMR::generate_odds_ratios()
 
-  #res %>%
-  #  dplyr::group_by(id.exposure, id.outcome) %>%
-  #  dplyr::group_map(~ mr_scatter_plot(.x, .y, dat, report), .keep = T)
-
-  # Volcano plot of each SNPs' WR results
-  #res[res$method == "Wald ratio", ] %>%
-  #  dplyr::group_map(~ volcano_plot(.x, report), .keep = T)
-
-  # PheWAS plot of MR results
-  res %>%
-    dplyr::group_by(id.outcome) %>%
-    dplyr::group_map(~ phewas_plot(.x, report), .keep = T)
-
-  # Forest plot of MR results
-  res %>%
-    dplyr::group_by(id.exposure) %>%
-    dplyr::group_map(~ forest_plot(.x, dat, report), .keep = T)
-
-  # Report results separately
-  main <- res[res$method %in% c("Wald ratio", "Inverse variance weighted"),]
-  sensitivity <- res[!(res$method %in% c("Wald ratio", "Inverse variance weighted")),]
-
-  report$add_results(main[c("id.exposure", "id.outcome", "exposure", "outcome",
-                            "method", "nsnp", "pval",
-                            "or", "or_lci95", "or_uci95")])
-
-  report$add_sresults("sresults", sensitivity[c("id.exposure", "id.outcome", "exposure", "outcome",
-                                    "method", "nsnp", "pval",
-                                    "or", "or_lci95", "or_uci95")])
-
-  # Heterogeneity
-  hetres <- TwoSampleMR::mr_heterogeneity(dat)
-  report$add_sresults("hetresults", hetres)
-
-  # Pleiotropy
-  pleiores <- TwoSampleMR::mr_pleiotropy_test(dat)
-  report$add_sresults("pleioresults", pleiores)
-
   # Steiger
   steigerres <- TwoSampleMR::directionality_test(dat)
-  steigerres$flag <- ifelse(steigerres$correct_causal_direction == T & steigerres$steiger_pval < 0.05,
+  steigerres$steigerflag <- ifelse(steigerres$correct_causal_direction == T & steigerres$steiger_pval < 0.05,
                             "True",
                             ifelse(steigerres$correct_causal_direction == F & steigerres$steiger_pval < 0.05,
                                    "False",
                                    "Unknown"))
-  report$add_sresults("steigerresults", steigerres)
 
-  report$bonferroni <- 0.05 / nrow(main)
-  if (conf$bonferroni_mr_p_thres == T) {
-    conf$mr_p_thres <- report$bonferroni
-  }
+  res <- base::merge(res, steigerres, by = c("exposure", "outcome", "id.exposure", "id.outcome"), all.x = TRUE)
 
   return(res)
 }
@@ -247,14 +216,41 @@ do_mr <- function(dat, report, conf)
 #' @param conf config::config file of parameter
 #'
 #' @return A data.frame of colocalistion results
-do_coloc <- function(dat, id1, id2, report, conf)
+do_coloc <- function(dat,
+                     method = "coloc.abf",
+                     coloc_window = 500000,
+                     bfile = NULL,
+                     pwcoco = NULL,
+                     workdir = tempdir(),
+                     cores = 1,
+                     verbose = TRUE)
 {
-  # Each unique pair of traits need to be colocalised
-  pairs <- .combine_ids(id1, id2)
+  if (!all(c("id.exposure", "id.outcome") %in% names(dat))) {
+    warning("Requires harmonised dataset for colocalisation; \"id.exposure\" and \"id.outcome\" columns not found.")
+    return(NULL)
+  }
 
-  cres <- parallel::mclapply(1:nrow(pairs), function(i)
+  if (!(method %in% c("coloc.abf", "pwcoco", "coloc.susie"))) {
+    warning("Colocalisation method not understood, defaulting to \"coloc.abf\". Must be one of the following: coloc.abf, pwcoco, coloc.susie.")
+    method = "coloc.abf"
+  }
+
+  if (method == "pwcoco" && Sys.info()['sysname'] == "Windows") {
+    .print_msg("PWCoCo is not an allowed method when using this pipeline in Windows, defaulting to \"coloc.abf\".", verbose = verbose)
+    method = "coloc.abf"
+  }
+  else if (method == "pwcoco" && (is.null(bfile) || is.null(pwcoco))) {
+    warning("PWCoCo requires the bfile and pwcoco arguments for paths to the Plink reference data and PWCoCo executible, respectively.")
+    return(NULL)
+  }
+
+  # Each unique pair of traits need to be colocalised
+  pairs <- tidyr::crossing(dat$id.exposure, dat$id.outcome)
+  names(pairs) <- c("id.exposure", "id.outcome")
+
+  coloc_res <- parallel::mclapply(1:nrow(pairs), function(i)
   {
-    subdat <- dat[dat$id.exposure == pairs[i, "id.x"] & dat$id.outcome == pairs[i, "id.y"],]
+    subdat <- dat[which(dat$id.exposure == pairs[i, "id.exposure"][[1]] & dat$id.outcome == pairs[i, "id.outcome"][[1]]), ]
 
     if (length(subdat) < 1 || nrow(subdat) < 1) {
       return(NULL)
@@ -263,33 +259,60 @@ do_coloc <- function(dat, id1, id2, report, conf)
     # Select region for which to do coloc
     # atm very simply the lowest P-value region
     idx <- which.min(subdat$pval.exposure)
-    chrpos <- paste0(subdat$chr[idx],
+    chrpos <- paste0(subdat$chr.exposure[idx],
                      ":",
-                     max(as.numeric(subdat$pos[idx]) - conf$coloc_window * 100, 0),
+                     max(as.numeric(subdat$position.exposure[idx]) - coloc_window, 0),
                      "-",
-                     as.numeric(subdat$pos[idx]) + conf$coloc_window * 100)
+                     as.numeric(subdat$position.exposure[idx]) + coloc_window)
 
-    f1 <- pairs[i, "filename.x"]
-    f2 <- pairs[i, "filename.y"]
+    f1 <- pairs[i, "id.exposure"][[1]]
+    f2 <- pairs[i, "id.outcome"][[1]]
 
-    if (file.exists(f1) & file.exists(f2))
-    {
-      cdat <- gwasglue::gwasvcf_to_coloc(f1, f2, chrpos)
-      regional_plot(cdat, pairs, i, report)
+    if (method == "coloc.abf") {
+      if (file.exists(f1) && file.exists(f2))
+      {
+        cdat <- gwasglue::gwasvcf_to_coloc(f1, f2, chrpos)
+      } else if (!file.exists(f1) && !file.exists(f2))
+      {
+        cdat <- gwasglue::ieugwasr_to_coloc(f1, f2, chrpos)
+      } else {
+        # One is file, one is not
+        ## TODO me :(
+      }
 
-      return(coloc_sub(cdat[[1]], cdat[[2]], pairs, i, chrpos, report, conf))
-    } else if (!file.exists(f1) & !file.exists(f2))
-    {
-      cdat <- gwasglue::ieugwasr_to_coloc(pairs[i, "id.x"], pairs[i, "id.y"], chrpos)
-      regional_plot(cdat, pairs, i, report)
+      cres <- .coloc_sub(cdat[[1]], cdat[[2]], verbose = verbose)
+    } else if (method == "pwcoco") {
+      if (file.exists(f1) && file.exists(f2)) {
+        .gwasvcf_to_pwcoco(f1, f2, chrpos, outfile = workdir)
+      } else if (!file.exists(f1) && !file.exists(f2)) {
+        .ieugwasr_to_pwcoco(f1, f2, chrpos, outfile = workdir)
+      }
 
-      return(coloc_sub(cdat[[1]], cdat[[2]], pairs, i, chrpos, report, conf))
-    } else {
-      # One is file, one is not
-      ## TODO me :(
+      cres <- .pwcoco_sub(chrpos, bfile, pwcoco, workdir)
     }
-  }, mc.cores = conf$cores)
-  return(cres)
+
+
+
+    if (method == "coloc.abf") {
+      cres <- .coloc_sub(cdat[[1]], cdat[[2]], verbose = verbose)
+    } else if (method == "pwcoco") {
+      cres <- .pwcoco_sub(cdat[[1]], cdat[[2]], verbose = verbose)
+    }
+
+    #regional_plot(cdat, pairs, i, report)
+
+    if (length(cres)) {
+      cres[length(cres) + 1] <- f1
+      names(cres)[length(cres)] <- "id.exposure"
+      cres[length(cres) + 1] <- f2
+      names(cres)[length(cres)] <- "id.outcome"
+    }
+
+    return(cres)
+  }, mc.cores = cores) %>%
+    dplyr::bind_rows()
+
+  return(coloc_res)
 }
 
 #' Sub-function for the colocalisation analyses
@@ -304,23 +327,16 @@ do_coloc <- function(dat, id1, id2, report, conf)
 #' @param conf config::config file of parameter
 #'
 #' @return Results, or empty if cannot run the colocalisation
-coloc_sub <- function(dat1, dat2, pairs, i, chrpos, report, conf)
+.coloc_sub <- function(dat1, dat2,
+                       min_snps = 100,
+                       p1 = 1e-4,
+                       p2 = 1e-4,
+                       p12 = 1e-5,
+                       verbose = TRUE)
 {
-  if (!length(dat1) || !length(dat2))
-  {
-    report$add_cresults(list(id1 = pairs[i, "id.x"],
-                             id2 = pairs[i, "id.y"],
-                             name1 = pairs[i, "trait.x"],
-                             name2 = pairs[i, "trait.y"],
-                             nsnps = 0,
-                             H0 = 0,
-                             H1 = 0,
-                             H2 = 0,
-                             H3 = 0,
-                             H4 = 0,
-                             chrpos = chrpos,
-                             plot = ""))
-    return()
+  if (!length(dat1) || !length(dat2)) {
+    .print_msg("No SNPs extracted for colocalisation analysis.", verbose)
+    return(NULL)
   }
 
   # MAFs should be similar and, as some GWAS are missing MAFs,
@@ -334,81 +350,170 @@ coloc_sub <- function(dat1, dat2, pairs, i, chrpos, report, conf)
   # best to ignore this coloc
   # TODO - better way of dealing with this?
   if (any(is.na(dat1$MAF)) || any(is.na(dat2$MAF)) ||
-      length(dat1$snp) < conf$coloc_min_snps || length(dat2$snp) < conf$coloc_min_snps)
+      length(dat1$snp) < min_snps || length(dat2$snp) < min_snps)
   {
-    report$add_cresults(list(id1 = pairs[i, "id.x"],
-                             id2 = pairs[i, "id.y"],
-                             name1 = pairs[i, "trait.x"],
-                             name2 = pairs[i, "trait.y"],
-                             nsnps = length(dat1$snp),
-                             H0 = -1,
-                             H1 = -1,
-                             H2 = -1,
-                             H3 = -1,
-                             H4 = -1,
-                             chrpos = chrpos,
-                             plot = ""))
-    return()
+    .print_msg("Minor allele frequenices are required for coloc but were not found in these datasets.", verbose)
+    return(NULL)
   }
 
   cres <- coloc::coloc.abf(dat1, dat2,
-                           p1 = conf$coloc_p1,
-                           p2 = conf$coloc_p2,
-                           p12 = conf$coloc_p12)
+                           p1 = p1,
+                           p2 = p2,
+                           p12 = p12)
 
-  report$add_cresults(list(id1 = pairs[i, "id.x"],
-                           id2 = pairs[i, "id.y"],
-                           name1 = pairs[i, "trait.x"],
-                           name2 = pairs[i, "trait.y"],
-                           nsnps = cres$summary[[1]],
-                           H0 = cres$summary[[2]],
-                           H1 = cres$summary[[3]],
-                           H2 = cres$summary[[4]],
-                           H3 = cres$summary[[5]],
-                           H4 = cres$summary[[6]],
-                           chrpos = chrpos,
-                           plot = ""))
-  return(cres)
+  return(cres$summary)
 }
 
-#' Sub-function to run heterogeneity analyses
-#' UNIMPLEMENTED
-do_heterogeneity <- function(dat, report)
+#' Write files for PWCoCo where data are read from two VCF objects or files.
+#'
+#' @param vcf1 VCF object or path to VCF file
+#' @param vcf2 VCF object or path to VCF file
+#' @param chrompos Character of the format chr:pos1-pos2
+#' @param type1 How to treat vcffile1 for coloc, either "quant" or "cc"
+#' @param type2 How to treat vcffile2 for coloc, either "quant" or "cc"
+#' @param outfile Path to output files, without file ending
+#'
+#' return 0 if success, 1 if there was a problem
+.gwasvcf_to_pwcoco <- function(vcf1, vcf2, chrompos, type1=NULL, type2=NULL, outfile)
 {
-  single <- TwoSampleMR::mr_singlesnp(dat)
+  overlap <- gwasvcf::vcflist_overlap(list(vcf1, vcf2), chrompos)
+  vcf1 <- overlap[[1]]
+  vcf2 <- overlap[[2]]
 
-  for (exposure in single$exposure)
+  if (length(vcf1) == 0 || length(vcf2) == 0)
   {
-    sres <- single[single$exposure == exposure, ]
-    sres <- sres[!startsWith(sres$SNP, "All"), ] # Exclude all analyses
-
-    if (length(sres) == 0 | nrow(sres) < 2)
-    {
-      report$add_hresults(list(id.exposure = sres$id.exposure[1],
-                               id.outcome = sres$id.outcome[1],
-                               exposure = sres$exposure[1],
-                               outcome = sres$outcome[1],
-                               method = "",
-                               Q = 0,
-                               Q_df = 0,
-                               Q_pval = 0))
-      next
-    }
-
-    # Multiplicative random effects
-    res <- summary(lm(b_out ~ -1 + b_exp, weights = 1/se_out^2))
-    Q_df = length(b_exp) - 1
-    Q = res$sigma^2 * Q_df
-    Q_pval = pchisq(Q, Q_df, low=FALSE)
+    message("No overlaps for the given chrompos in ", ifelse(length(vcf1) == 0, "vcf1", "vcf2"), ".")
+    return(1)
   }
 
-  #res_nosens <- res[res$method %in% c("Wald ratio", "Inverse variance weighted"), ]
+  # vcf1
+  tib1 <- vcf1 %>% gwasvcf::vcf_to_granges() %>% dplyr::as_tibble() %>%
+    dplyr::select(rsid, ALT, REF, AF, ES, SE, LP, SS, NC) %>%
+    dplyr::rename(
+      SNP = rsid,
+      A1 = ALT,
+      A2 = REF,
+      freq = AF,
+      b = ES,
+      se = SE,
+      p = LP,
+      N = ss,
+      N_case = NC
+    )
+  tib1$p <- 10^(-tib1$p)
 
-  # Heterogeneity if more than 1 SNP
-  #if (length(dat) && nrow(dat) > 1) {
-  #  hetero <- TwoSampleMR::mr_ivw(res_nosens$beta.exposure,
-  #                                res_nosens$beta.outcome,
-  #                                res_nosens$se.exposure,
-  #                                res_nosens$se.outcome)
-  #}
+  # Coloc type -- if study type is continuous then do not need the case column
+  if (type1 == "quant" || VariantAnnotation::header(vcf1) %>% VariantAnnotation::meta() %>% {.[["SAMPLE"]][["StudyType"]]} == "Continuous")
+  {
+    tib1 <- tib1[c("SNP", "A1", "A2", "freq", "b", "se", "p", "N")]
+  }
+
+  # vcf2
+  tib2 <- vcf2 %>% gwasvcf::vcf_to_granges() %>% dplyr::as_tibble() %>%
+    dplyr::select(rsid, ALT, REF, AF, ES, SE, LP, SS, NC) %>%
+    dplyr::rename(
+      SNP = rsid,
+      A1 = ALT,
+      A2 = REF,
+      freq = AF,
+      b = ES,
+      se = SE,
+      p = LP,
+      N = ss,
+      N_case = NC
+    )
+  tib2$p <- 10^(-tib2$p)
+
+  # Coloc type -- if study type is continuous then do not need the case column
+  if (type2 == "quant" || VariantAnnotation::header(vcf2) %>% VariantAnnotation::meta() %>% {.[["SAMPLE"]][["StudyType"]]} == "Continuous")
+  {
+    tib2 <- tib2[c("SNP", "A1", "A2", "freq", "b", "se", "p", "N")]
+  }
+
+  write.table(tib1, file=paste0(outfile, "1.txt"), row=F, col=T, qu=F)
+  write.table(tib1, file=paste0(outfile, "2.txt"), row=F, col=T, qu=F)
+  return(0)
+}
+
+#' Write files for PWCoCo where data are read from the OpenGWAS DB.
+#'
+#' @param id1 ID for trait 1
+#' @param id2 ID for trait 2
+#' @param chrompos Character of the format chr:pos1-pos2
+#' @param type1 How to treat vcffile1 for coloc, either "quant" or "cc"
+#' @param type2 How to treat vcffile2 for coloc, either "quant" or "cc"
+#' @param outfile Path to output files, without file ending
+#'
+#' return 0 if success, 1 if there was a problem
+.ieugwasr_to_pwcoco <- function(id1, id2, chrompos, type1=NULL, type2=NULL, outfile)
+{
+  tib1 <- ieugwasr::associations(id=id1, variants=chrompos) %>% subset(., !duplicated(rsid))
+  tib2 <- ieugwasr::associations(id=id2, variants=chrompos) %>% subset(., !duplicated(rsid))
+
+  if (length(tib1) < 1 || length(tib2) < 1)
+  {
+    message("Data could not be read using the ieugwasr package for id1 = ", id1, " and id2 = ", id2, ".")
+    return(1)
+  }
+
+  # Matching the files is quicker for PWCoCo, so best to off-load to that?
+  # Save data -- PWCoCo handles the matching and cleaning mostly by itself
+  tib1 %<>% dplyr::select(rsid, ea, nea, eaf, beta, se, p, n) %>%
+    dplyr::rename(
+      SNP = rsid,
+      A1 = ea,
+      A2 = nea,
+      freq = eaf,
+      b = beta,
+      se = se,
+      p = p,
+      N = n
+    )
+  # Need to determine whether there are cases
+  info1 <- ieugwasr::gwasinfo(id1)
+  if ("ncase" %in% colnames(info1))
+  {
+    tib1$N_case <- info1$ncase
+  }
+
+  tib2 %<>% dplyr::select(rsid, ea, nea, eaf, beta, se, p, n) %>%
+    dplyr::rename(
+      SNP = rsid,
+      A1 = ea,
+      A2 = nea,
+      freq = eaf,
+      b = beta,
+      se = se,
+      p = p,
+      N = n
+    )
+  info2 <- ieugwasr::gwasinfo(id2)
+  if ("ncase" %in% colnames(info2))
+  {
+    tib2$N_case <- info2$ncase
+  }
+
+  write.table(tib1, file=paste0(outfile, "1.txt"), row=F, col=T, qu=F)
+  write.table(tib2, file=paste0(outfile, "2.txt"), row=F, col=T, qu=F)
+  return(0)
+}
+
+.pwcoco_sub <- function(bfile,
+                        chrpos,
+                        pwcoco,
+                        maf = 0.01,
+                        p1 = 1e-4,
+                        p2 = 1e-4,
+                        p12 = 1e-5,
+                        workdir = tempdir(),
+                        verbose = TRUE)
+{
+  chr <- as.integer(strsplit(chrpos, ":")[[1]][1])
+
+  cmd <- glue::glue("{pwcoco} --bfile {bfile} --sum_stats1 {file.path(workdir, '1.txt')} --sum_stats2 {file.path(workdir, '2.txt')} --out {file.path(workdir, 'out')} --chr {chr} --maf {maf}")
+  system(cmd)
+
+  res <- data.table::fread(file.path(workdir, 'out.coloc'))
+
+  return(res)
 }
