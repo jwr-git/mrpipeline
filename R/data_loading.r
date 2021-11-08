@@ -27,19 +27,65 @@
   }
 }
 
-read_dataset <- function(ids,
-                         rsids = NULL,
-                         pval = 5e-8,
+read_exposure <- function(ids,
+                          pval = 5e-8,
+                          plink = NULL,
+                          bfile = NULL,
+                          clump_r2 = 0.01,
+                          clump_kb = 10000,
+                          pop = "EUR",
+                          cores = 1,
+                          verbose = TRUE)
+{
+  exp <- .read_dataset(ids = ids,
+                       pval = pval,
+                       proxies = FALSE,
+                       plink = plink,
+                       bfile = bfile,
+                       clump_r2 = clump_r2,
+                       clump_kb = clump_kb,
+                       pop = pop,
+                       type = "exposure",
+                       cores = cores,
+                       verbose = verbose)
+
+  return(exp)
+}
+
+read_outcome <- function(ids,
+                         rsids,
                          proxies = TRUE,
                          proxy_rsq = 0.8,
                          plink = NULL,
                          bfile = NULL,
-                         clump_r2 = 0.01,
-                         clump_kb = 10000,
-                         pop = "EUR",
-                         type = "exposure",
                          cores = 1,
                          verbose = TRUE)
+{
+  out <- .read_dataset(ids = ids,
+                       rsids = rsids,
+                       proxies = proxies,
+                       plink = plink,
+                       bfile = bfile,
+                       type = "outcome",
+                       cores = cores,
+                       verbose = verbose)
+
+  return(out)
+}
+
+.read_dataset <- function(ids,
+                          rsids = NULL,
+                          pval = 5e-8,
+                          proxies = TRUE,
+                          proxy_rsq = 0.8,
+                          plink = NULL,
+                          bfile = NULL,
+                          clump_r2 = 0.01,
+                          clump_kb = 10000,
+                          pop = "EUR",
+                          type = "exposure",
+                          cores = 1,
+                          verbose = TRUE)
 {
   if (Sys.info()['sysname'] == "Windows") {
     .print_msg("Running this pipeline on Windows disables the following features:", verbose)
@@ -162,6 +208,7 @@ read_dataset <- function(ids,
       }
     }
 
+    dat[[paste0("file", type)]] <- id
     return(dat)
   }, mc.cores = cores) %>%
     dplyr::bind_rows()

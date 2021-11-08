@@ -195,14 +195,18 @@ do_mr <- function(dat, f_cutoff = 10, verbose = TRUE)
     TwoSampleMR::generate_odds_ratios()
 
   # Steiger
-  steigerres <- TwoSampleMR::directionality_test(dat)
-  steigerres$steigerflag <- ifelse(steigerres$correct_causal_direction == T & steigerres$steiger_pval < 0.05,
-                            "True",
-                            ifelse(steigerres$correct_causal_direction == F & steigerres$steiger_pval < 0.05,
-                                   "False",
-                                   "Unknown"))
+  if (any(is.na(dat$samplesize.exposure)) || any(is.na(dat$samplesize.outcome))) {
+    warning("Samplesizes are required for Steiger filtering.")
+  } else {
+    steigerres <- TwoSampleMR::directionality_test(dat)
+    steigerres$steigerflag <- ifelse(steigerres$correct_causal_direction == T & steigerres$steiger_pval < 0.05,
+                              "True",
+                              ifelse(steigerres$correct_causal_direction == F & steigerres$steiger_pval < 0.05,
+                                     "False",
+                                     "Unknown"))
 
-  res <- base::merge(res, steigerres, by = c("exposure", "outcome", "id.exposure", "id.outcome"), all.x = TRUE)
+    res <- base::merge(res, steigerres, by = c("exposure", "outcome", "id.exposure", "id.outcome"), all.x = TRUE)
+  }
 
   return(res)
 }
@@ -225,8 +229,8 @@ do_coloc <- function(dat,
                      cores = 1,
                      verbose = TRUE)
 {
-  if (!all(c("id.exposure", "id.outcome") %in% names(dat))) {
-    warning("Requires harmonised dataset for colocalisation; \"id.exposure\" and \"id.outcome\" columns not found.")
+  if (!all(c("file.exposure", "file.outcome") %in% names(dat))) {
+    warning("Requires harmonised dataset for colocalisation; \"file.exposure\" and \"file.outcome\" columns not found.")
     return(NULL)
   }
 
@@ -245,12 +249,12 @@ do_coloc <- function(dat,
   }
 
   # Each unique pair of traits need to be colocalised
-  pairs <- tidyr::crossing(dat$id.exposure, dat$id.outcome)
-  names(pairs) <- c("id.exposure", "id.outcome")
+  pairs <- tidyr::crossing(dat$file.exposure, dat$file.outcome)
+  names(pairs) <- c("file.exposure", "file.outcome")
 
   coloc_res <- parallel::mclapply(1:nrow(pairs), function(i)
   {
-    subdat <- dat[which(dat$id.exposure == pairs[i, "id.exposure"][[1]] & dat$id.outcome == pairs[i, "id.outcome"][[1]]), ]
+    subdat <- dat[which(dat$file.exposure == pairs[i, "file.exposure"][[1]] & dat$file.outcome == pairs[i, "file.outcome"][[1]]), ]
 
     if (length(subdat) < 1 || nrow(subdat) < 1) {
       return(NULL)
@@ -265,8 +269,8 @@ do_coloc <- function(dat,
                      "-",
                      as.numeric(subdat$position.exposure[idx]) + coloc_window)
 
-    f1 <- pairs[i, "id.exposure"][[1]]
-    f2 <- pairs[i, "id.outcome"][[1]]
+    f1 <- pairs[i, "file.exposure"][[1]]
+    f2 <- pairs[i, "file.outcome"][[1]]
 
     if (method == "coloc.abf") {
       if (file.exists(f1) && file.exists(f2))
@@ -303,9 +307,9 @@ do_coloc <- function(dat,
 
     if (length(cres)) {
       cres[length(cres) + 1] <- f1
-      names(cres)[length(cres)] <- "id.exposure"
+      names(cres)[length(cres)] <- "file.exposure"
       cres[length(cres) + 1] <- f2
-      names(cres)[length(cres)] <- "id.outcome"
+      names(cres)[length(cres)] <- "file.outcome"
     }
 
     return(cres)
