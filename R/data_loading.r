@@ -208,7 +208,7 @@ read_outcome <- function(ids,
       }
     }
 
-    dat[[paste0("file", type)]] <- id
+    dat[[paste0("file.", type)]] <- id
     return(dat)
   }, mc.cores = cores) %>%
     dplyr::bind_rows()
