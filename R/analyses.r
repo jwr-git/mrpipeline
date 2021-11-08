@@ -263,11 +263,11 @@ do_coloc <- function(dat,
     # Select region for which to do coloc
     # atm very simply the lowest P-value region
     idx <- which.min(subdat$pval.exposure)
-    chrpos <- paste0(subdat$chr.exposure[idx],
+    chrpos <- paste0(as.character(subdat$chr.exposure[idx]),
                      ":",
-                     max(as.numeric(subdat$position.exposure[idx]) - coloc_window, 0),
+                     max(as.numeric(subdat$pos.exposure[idx]) - coloc_window, 0),
                      "-",
-                     as.numeric(subdat$position.exposure[idx]) + coloc_window)
+                     as.numeric(subdat$pos.exposure[idx]) + coloc_window)
 
     f1 <- pairs[i, "file.exposure"][[1]]
     f2 <- pairs[i, "file.outcome"][[1]]
