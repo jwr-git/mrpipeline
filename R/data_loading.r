@@ -64,6 +64,10 @@ read_dataset <- function(ids,
     .print_msg(paste0("Unknown type \"", type, "\" given; defaulting to exposure."), verbose)
   }
 
+  if (type == "outcome" && is.null(rsids)) {
+    stop("Type \"outcome\" requires a list of rsIDs to extract.")
+  }
+
   if (!is.null(rsids)) {
     rsids <- unique(rsids)
   }
@@ -79,20 +83,12 @@ read_dataset <- function(ids,
     {
       .print_msg(paste0("Reading \"", id, "\" as GWAS VCF file."), verbose)
 
-      if (!is.null(rsids)) {
-        # List of SNPs
+      if (type == "exposure") {
+        dat <- gwasvcf::query_gwas(vcf = VariantAnnotation::readVcf(id),
+                                   pval = pval)
+      } else {
         dat <- gwasvcf::query_gwas(vcf = VariantAnnotation::readVcf(id),
                                    rsid = rsids,
-                                   proxies = ifelse(proxies == TRUE, "yes", "no"),
-                                   bfile = bfile,
-                                   tag_kb = tag_kb,
-                                   tag_nsnp = tag_nsnp,
-                                   tag_r2 = tag_r2)
-
-      } else {
-        # P value cutoff
-        dat <- gwasvcf::query_gwas(vcf = VariantAnnotation::readVcf(id),
-                                   pval = pval,
                                    proxies = ifelse(proxies == TRUE, "yes", "no"),
                                    bfile = bfile,
                                    tag_kb = tag_kb,
@@ -106,7 +102,7 @@ read_dataset <- function(ids,
       }
 
       dat <- dat %>%
-        gwasglue::gwasvcf_to_TwoSampleMR(dat, type = type)
+        gwasglue::gwasvcf_to_TwoSampleMR(., type = type)
 
       if (nrow(dat) < 1) {
         warning("No SNPs extracted with the given parameters. Please re-check these and try again.")
