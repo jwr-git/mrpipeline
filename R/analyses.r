@@ -1,8 +1,10 @@
 #' Calculates F-statistic and related
 #'
-#' @param dat A data.frame of data
+#' @param dat A data.frame
+#' @param f_cutoff Define an F-statistic cutoff
+#' @param verbose Print messages or not
 #'
-#' @return List of data.frame and integer
+#' @return Modified `dat` data.frame
 calc_f_stat <- function(dat, f_cutoff = 10, verbose = TRUE)
 {
   full.f.stat <- T
@@ -70,9 +72,9 @@ calc_f_stat <- function(dat, f_cutoff = 10, verbose = TRUE)
 #' the Wald ratio method.
 #' From https://doi.org/10.1101/2021.03.01.433439 supplementary
 #'
-#' @param object Data.frame or vector
+#' @param object Harmonised data.frame
 #'
-#' @return Appended result
+#' @return Results data.frame
 .wr_taylor_approx <- function(dat)
 {
   b <- dat$beta.outcome / dat$beta.exposure
@@ -96,6 +98,12 @@ calc_f_stat <- function(dat, f_cutoff = 10, verbose = TRUE)
   return(res)
 }
 
+#' Calculates the inverse variance weighted delta method from the
+#' MendelianRandomization package
+#'
+#' @param object Harmonised data.frame
+#'
+#' @return Results data.frame
 .ivw_delta <- function(dat)
 {
   nsnps <- nrow(dat)
@@ -145,8 +153,8 @@ calc_f_stat <- function(dat, f_cutoff = 10, verbose = TRUE)
 #' Also generates a number of plots, e.g. volcano plots, for MR results.
 #'
 #' @param dat A data.frame of harmonised data
-#' @param report QCReport class of results, etc. for reporting
-#' @param conf config::config file of parameter
+#' @param f_cutoff Define an F-statistic cutoff
+#' @param verbose Print messages or not
 #'
 #' @return A data.frame of MR results
 do_mr <- function(dat, f_cutoff = 10, verbose = TRUE)
@@ -214,10 +222,13 @@ do_mr <- function(dat, f_cutoff = 10, verbose = TRUE)
 #' Runs colocalisation using the coloc R package's coloc.abf function
 #'
 #' @param dat A data.frame of harmonised data
-#' @param id1 DatasetsID class of exposure IDs
-#' @param id2 DatasetsID class of outcome IDs
-#' @param report QCReport class of results, etc. for reporting
-#' @param conf config::config file of parameter
+#' @param method Which method of colocalisation to use: coloc.abf, coloc.susie, pwcoco
+#' @param coloc_window Size (+/-) of region to extract for colocalisation analyses
+#' @param bfile Path to Plink bed/bim/fam files
+#' @param pwcoco If PWCoCo is the selected coloc method, path to PWCoCo executible
+#' @param workdir Path to save temporary files
+#' @param cores Amount of cores to use for multi-threaded data extraction
+#' @param verbose Print messages or not
 #'
 #' @return A data.frame of colocalistion results
 do_coloc <- function(dat,
@@ -260,14 +271,22 @@ do_coloc <- function(dat,
       return(NULL)
     }
 
+    if ("pos.exposure" %in% names(subdat)) {
+      pos_var <- "pos.exposure"
+    } else if ("position.exposure" %in% names(subdat)) {
+      pos_var <- "position.exposure"
+    } else {
+      pos_var <- "bp.exposure"
+    }
+
     # Select region for which to do coloc
     # atm very simply the lowest P-value region
     idx <- which.min(subdat$pval.exposure)
     chrpos <- paste0(as.character(subdat$chr.exposure[idx]),
                      ":",
-                     max(as.numeric(subdat$pos.exposure[idx]) - coloc_window, 0),
+                     max(as.numeric(subdat[idx, pos_var]) - coloc_window, 0),
                      "-",
-                     as.numeric(subdat$pos.exposure[idx]) + coloc_window)
+                     as.numeric(subdat[idx, pos_var]) + coloc_window)
 
     f1 <- pairs[i, "file.exposure"][[1]]
     f2 <- pairs[i, "file.outcome"][[1]]
@@ -323,14 +342,13 @@ do_coloc <- function(dat,
 #'
 #' @param dat1 SNPs, etc. from first dataset
 #' @param dat2 SNPs, etc. from second dataset
-#' @param pairs A data.frame of pairwise combined IDs
-#' @param i Location in pairs being colocalised
-#' @param chrpos Chromosome position to search for SNPs, default uses region
-#'               around lead SNP but can be overwritten if provided
-#' @param report QCReport class of results, etc. for reporting
-#' @param conf config::config file of parameter
+#' @param min_snps Number of minimum SNPs to check for analysis to continue
+#' @param p1 p1 for coloc
+#' @param p2 p2 for coloc
+#' @param p12 p12 for coloc
+#' @param verbose Print messages or not
 #'
-#' @return Results, or empty if cannot run the colocalisation
+#' @return Results data.frame
 .coloc_sub <- function(dat1, dat2,
                        min_snps = 100,
                        p1 = 1e-4,
@@ -353,7 +371,7 @@ do_coloc <- function(dat,
   # Even after merge, if any MAF are missing, it's probs
   # best to ignore this coloc
   # TODO - better way of dealing with this?
-  if (any(is.na(dat1$MAF)) || any(is.na(dat2$MAF)) ||
+  if (all(is.na(dat1$MAF)) || all(is.na(dat2$MAF)) ||
       length(dat1$snp) < min_snps || length(dat2$snp) < min_snps)
   {
     .print_msg("Minor allele frequenices are required for coloc but were not found in these datasets.", verbose)
@@ -502,6 +520,19 @@ do_coloc <- function(dat,
   return(0)
 }
 
+#' Sub-function to run PWCoCo
+#'
+#' @param bfile Path to Plink bed/bim/fam files
+#' @param chrpos Character of the format chr:pos1-pos2
+#' @param pwcoco Path to PWCoCo executible
+#' @param maf MAF cut-off
+#' @param p1 p1 for coloc
+#' @param p2 p2 for coloc
+#' @param p12 p12 for coloc
+#' @param workdir Path to save temporary files
+#' @param verbose Print messages or not
+#'
+#' @return Results data.frame
 .pwcoco_sub <- function(bfile,
                         chrpos,
                         pwcoco,
