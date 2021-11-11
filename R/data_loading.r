@@ -89,8 +89,9 @@ read_outcome <- function(ids,
 {
   if (Sys.info()['sysname'] == "Windows") {
     .print_msg("Running this pipeline on Windows disables the following features:", verbose)
-    .print_msg("Local clumping, proxy searching and other Plink operations.", verbose)
+    .print_msg("Local clumping, proxy searching and other Plink operations; parallelisation.", verbose)
     plink <- NULL
+    cores <- 1
   }
 
   if (is.null(rsids) && is.null(pval)) {
@@ -171,13 +172,13 @@ read_outcome <- function(ids,
                                       r2 = proxy_rsq)
       }
 
-      if (!exists("dat") || !length(dat)) {
+      if (!exists("dat") || !length(dat) || inherits(dat, "response")) {
         warning("Data extraction failed for ", id, ". Please re-check parameters and file paths.")
         return(NULL)
       }
 
       if (nrow(dat) < 1) {
-        warning("No SNPs extracted with the given parameters. Please re-check these and try again.")
+        warning("No SNPs extracted with the given parameters for \"", id, "\".")
         return(NULL)
       }
 
