@@ -173,47 +173,40 @@ phewas_plot <- function(res, report)
 #' Plots a regional plot of the area being tested for colocalisation
 #'
 #' @param dat A data.frame of harmonised data
-#' @param pairs A data.frame of pairwise combined IDs
-#' @param i Location in pairs being tested
-#' @param report QCReport class of results, etc. for reporting
+#' @param exposure Character, name of exposure
+#' @param outcome Character, name of outcome
+#' @param bfile Path to Plink bed/bim/fam files
+#' @param plink Path to Plink binary
+#' @param verbose Print messages or not
 #'
 #' @return NULL
-regional_plot <- function(dat, pairs, i, report)
+regional_plot <- function(dat, exposure, outcome, bfile = NULL, plink = NULL, verbose = TRUE)
 {
+  p <- NA
   if (require("gassocplot"))
   {
     tryCatch(
       expr = {
-        dat <- gwasglue::coloc_to_gassocplot(dat)
+        dat <- gwasglue::coloc_to_gassocplot(dat, bfile = bfile, plink_bin = plink)
         p <- gassocplot::stack_assoc_plot(dat$markers, dat$z, dat$corr, traits = dat$traits)
 
         # Annotate titles
         # TODO Better way of referencing these than hard-coded numbers?
         tryCatch({
-          p$grobs[[1]]$grobs[[22]]$label <- pairs[i, "trait.x"] # Top
-          p$grobs[[1]]$grobs[[65]]$label <- pairs[i, "trait.y"] # Bottom
+          p$grobs[[1]]$grobs[[22]]$label <- exposure # Top
+          p$grobs[[1]]$grobs[[65]]$label <- outcome # Bottom
         })
 
         # a <- grid.grabExpr(gassocplot::stack_assoc_plot(dat$markers, dat$z, dat$corr, traits = dat$traits)) %>%
         # editGrob()
-
-        report$add_plot(list(id1 = dat$traits[1],
-                             id2 = dat$traits[2],
-                             name1 = pairs[i, "trait.x"],
-                             name2 = pairs[i, "trait.y"],
-                             type = "regional"),
-                        p)
       },
       error = function(e) {
-        report$add_plot(list(id1 = dat$traits[1],
-                             id2 = dat$traits[2],
-                             name1 = pairs[i, "trait.x"],
-                             name2 = pairs[i, "trait.y"],
-                             type = "regional"),
-                        NA)
+        .print_msg(paste0("Could not generate regional plot for \"", exposure, "\" and \"", outcome, "\".)"), verbose = verbose)
       }
     )
   }
+
+  return(p)
 }
 
 #' Plots a scatter plot of MR results
