@@ -154,10 +154,11 @@ calc_f_stat <- function(dat, f_cutoff = 10, verbose = TRUE)
 #'
 #' @param dat A data.frame of harmonised data
 #' @param f_cutoff Define an F-statistic cutoff
+#' @param all_wr Should the Wald ratio be calculated for all SNPs, even if IVW can be used?
 #' @param verbose Print messages or not
 #'
 #' @return A data.frame of MR results
-do_mr <- function(dat, f_cutoff = 10, verbose = TRUE)
+do_mr <- function(dat, f_cutoff = 10, all_wr = TRUE, verbose = TRUE)
 {
   if (!is.null(f_cutoff)) {
     if ("f.stat.exposure" %in% names(dat)) {
@@ -175,11 +176,18 @@ do_mr <- function(dat, f_cutoff = 10, verbose = TRUE)
     nsnps <- nrow(x)
 
     # WR on all single SNPs
-    res <- lapply(1:nsnps, function(i)
+    if (nsnps == 1 || (nsnps > 1 && all_wr))
     {
-      with(x, .wr_taylor_approx(x[i, ]))
-    })
-    res <- do.call(rbind, res)
+      res <- lapply(1:nsnps, function(i)
+      {
+        with(x, .wr_taylor_approx(x[i, ]))
+      })
+      res <- do.call(rbind, res)
+      wr_res <- TRUE
+    }
+    else {
+      wr_res <- FALSE
+    }
 
     # IVW if applicable
     if (nsnps > 1)
@@ -187,7 +195,11 @@ do_mr <- function(dat, f_cutoff = 10, verbose = TRUE)
       tryCatch(
         expr = {
           res_ <- .ivw_delta(x)
-          res <- rbind(res, res_)
+          if (wr_res) {
+            res <- rbind(res, res_)
+          } else {
+            res <- res_
+          }
         },
         error = function(e) {
           message("Error encounted in IVW, no result for this will be given: ")
@@ -225,6 +237,7 @@ do_mr <- function(dat, f_cutoff = 10, verbose = TRUE)
 #' @param method Which method of colocalisation to use: coloc.abf, coloc.susie, pwcoco
 #' @param coloc_window Size (+/-) of region to extract for colocalisation analyses
 #' @param bfile Path to Plink bed/bim/fam files
+#' @param plink Path to Plink binary
 #' @param pwcoco If PWCoCo is the selected coloc method, path to PWCoCo executible
 #' @param workdir Path to save temporary files
 #' @param cores Amount of cores to use for multi-threaded data extraction
@@ -235,6 +248,7 @@ do_coloc <- function(dat,
                      method = "coloc.abf",
                      coloc_window = 500000,
                      bfile = NULL,
+                     plink = NULL,
                      pwcoco = NULL,
                      workdir = tempdir(),
                      cores = 1,
@@ -314,15 +328,24 @@ do_coloc <- function(dat,
       cres <- .pwcoco_sub(chrpos, bfile, pwcoco, workdir)
     }
 
-
-
     if (method == "coloc.abf") {
       cres <- .coloc_sub(cdat[[1]], cdat[[2]], verbose = verbose)
     } else if (method == "pwcoco") {
       cres <- .pwcoco_sub(cdat[[1]], cdat[[2]], verbose = verbose)
     }
 
-    #regional_plot(cdat, pairs, i, report)
+    if (length(cdat[[1]]$snp) > 500 && (is.null(plink) || is.null(bfile))) {
+      warning("Cannot generate regional plot as the number of SNPs in the region is above 500 and no bfile/Plink arguments have been given.")
+      p <- NA
+    } else if (length(cdat[[1]]$snp) <= 500) {
+      p <- regional_plot(cdat, subdat$exposure[1], subdat$outcome[1], verbose = verbose)
+    } else {
+      p <- regional_plot(cdat, subdat$exposure[1], subdat$outcome[1], bfile = bfile, plink = plink, verbose = verbose)
+    }
+
+    if (all(is.na(cres))) {
+      return(NA)
+    }
 
     if (length(cres)) {
       cres[length(cres) + 1] <- f1
@@ -331,11 +354,37 @@ do_coloc <- function(dat,
       names(cres)[length(cres)] <- "file.outcome"
     }
 
-    return(cres)
-  }, mc.cores = cores) %>%
-    dplyr::bind_rows()
+    ret_cres <- as.data.frame(split(unname(cres), names(cres)))
 
-  return(coloc_res)
+    return(list(data.frame = ret_cres, plot = p))
+  }, mc.cores = cores) %>%
+    `c`(.)
+
+  # This is not vectorised but could be!
+  coloc.df <- tibble::tibble(file.exposure = character(),
+                             file.outcome = character(),
+                             nsnps = numeric(),
+                             PP.H0.abf = numeric(),
+                             PP.H1.abf = numeric(),
+                             PP.H2.abf = numeric(),
+                             PP.H3.abf = numeric(),
+                             PP.H4.abf = numeric())
+  for (i in 1:length(coloc_res)) {
+    if (all(is.na(coloc_res[[i]]))) {
+      next
+    }
+    coloc.df <- rbind(coloc.df, coloc_res[[i]]$data.frame)
+  }
+
+  # This vectorised version is iffy
+  #coloc.df <- t(as.data.frame(sapply(coloc_res[which(!is.na(sapply(coloc_res, '[[', 1)))], '[[', 1)))
+  #coloc.df <- as.data.frame(coloc.df)
+  #rownames(coloc.df) <- NULL
+  #coloc.df[, 3:8] <- sapply(coloc.df[, 3:8], as.numeric)
+
+  coloc.plots <- sapply(coloc_res[which(!is.na(sapply(coloc_res, '[[', 1)))], '[[', 2)
+
+  return(list(res = coloc.df, plots = coloc.plots))
 }
 
 #' Sub-function for the colocalisation analyses
@@ -371,17 +420,27 @@ do_coloc <- function(dat,
   # Even after merge, if any MAF are missing, it's probs
   # best to ignore this coloc
   # TODO - better way of dealing with this?
-  if (all(is.na(dat1$MAF)) || all(is.na(dat2$MAF)) ||
-      length(dat1$snp) < min_snps || length(dat2$snp) < min_snps)
+  if (all(is.na(dat1$MAF)) || all(is.na(dat2$MAF)))
   {
     .print_msg("Minor allele frequenices are required for coloc but were not found in these datasets.", verbose)
     return(NULL)
   }
 
-  cres <- coloc::coloc.abf(dat1, dat2,
-                           p1 = p1,
-                           p2 = p2,
-                           p12 = p12)
+  if (length(dat1$snp) < min_snps || length(dat2$snp) < min_snps)
+  {
+    .print_msg(paste0("Datasets did not contain enough SNPs (< ", min_snps, ") for colocalisation. Skipping."), verbose)
+    return(NULL)
+  }
+
+  attempt <- try(cres <- coloc::coloc.abf(dat1, dat2,
+                                          p1 = p1,
+                                          p2 = p2,
+                                          p12 = p12),
+                 silent = T)
+
+  if (inherits(attempt, "try-error")) {
+    return(NA)
+  }
 
   return(cres$summary)
 }
