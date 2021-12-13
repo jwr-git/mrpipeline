@@ -20,6 +20,117 @@
 # - PWCoCo
 # 5. Report
 
+file_to_gwasvcf <- function(file,
+                            chr_col,
+                            pos_col,
+                            nea_col,
+                            ea_col,
+                            eaf_col = NULL,
+                            beta_col = NULL,
+                            se_col = NULL,
+                            pval_col = NULL,
+                            n = NULL,
+                            n_case = NULL,
+                            name = NULL,
+                            header = TRUE,
+                            sep = "\t",
+                            cores = 1,
+                            verbose = TRUE
+                            )
+{
+  outputs <- parallel::mclapply(1:nrow(file), function(i)
+  {
+    f <- file[i]
+
+    if (!file.exists(f)) {
+      .print_msg(paste0("Could not find file \"", f, "\". Skipping."), verbose)
+      next
+    }
+
+    dat <- read.table(f, header = header, sep = sep, stringsAsFactors = F)
+
+    if (nrow(dat) < 1) {
+      .print_msg(paste0("Failed to load data from file \"", f, "\". Skipping."), verbose)
+      next
+    }
+
+    out <- paste0(file_path_sans_ext(file), ".vcf")
+
+    dat_to_gwasvcf(dat, out, chr_col, pos_col, nea_col, ea_col,
+                  eaf_col = eaf_col, beta_col = beta_col, se_col = se_col,
+                  pval_col = pval_col, n = n, n_case = n_case, name = name,
+                  verbose = verbse)
+  }, mc.cores = cores)
+
+  return(outputs)
+}
+
+dat_to_gwasvcf <- function(dat,
+                           out,
+                           chr_col,
+                           pos_col,
+                           nea_col,
+                           ea_col,
+                           eaf_col = NULL,
+                           beta_col = NULL,
+                           se_col = NULL,
+                           pval_col = NULL,
+                           n = NULL,
+                           n_case = NULL,
+                           name = NULL,
+                           verbose = TRUE)
+{
+  if (nrow(dat) < 1) {
+    return(NA)
+  }
+
+  # Check if these are columns or single values
+  # Unsure if this is necessary or whether the gwasvcf::create_vcf can handle
+  # this by itself without any pre-cleaning...
+  if (n %in% names(dat)) {
+    n_col <- n
+  } else {
+    n_col <- NA
+  }
+
+  if (n_case %in% names(dat)) {
+    ncase_col <- n_case
+  } else {
+    ncase_col <- NA
+  }
+
+  if (name %in% names(dat)) {
+    name_col <- name
+  } else {
+    name_col <- NA
+  }
+
+  attempt <- tryCatch(
+    expr = {
+      vcf <- dat %>%
+        gwasvcf::create_vcf(chrom = chr_col,
+                            pos = pos_col,
+                            nea = nea_col,
+                            ea = ea_col,
+                            snp = snp_col,
+                            ea_af = eaf_col,
+                            effect = beta_col,
+                            se = se_col,
+                            pval = pval_col,
+                            n = ifelse(is.na(n_col), n, n_col),
+                            ncase = ifelse(is.na(ncase_col), n_case, ncase_col),
+                            name = ifelse(is.na(name_col), name, name_col))
+    },
+    error = function(e) {
+      .print_msg(paste0("Error creating vcf:"), verbose)
+      .print_msg(e, verbose)
+      return(NA)
+    })
+
+  VariantAnnotation::writeVcf(vcf, file = out)
+  return(out)
+}
+
 .print_msg <- function(msg, verbose)
 {
   if (verbose == TRUE) {
