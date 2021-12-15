@@ -110,7 +110,7 @@ dat_to_gwasvcf <- function(dat,
 
   attempt <- tryCatch(
     expr = {
-      vcf <- dat %>%
+      vcf <- dat %$%
         gwasvcf::create_vcf(chrom = chr_col,
                             pos = pos_col,
                             nea = nea_col,
