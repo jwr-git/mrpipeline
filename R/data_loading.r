@@ -25,6 +25,7 @@ file_to_gwasvcf <- function(file,
                             pos_col,
                             nea_col,
                             ea_col,
+                            snp_col = NULL,
                             eaf_col = NULL,
                             beta_col = NULL,
                             se_col = NULL,
@@ -57,8 +58,9 @@ file_to_gwasvcf <- function(file,
     out <- paste0(file_path_sans_ext(file), ".vcf")
 
     dat_to_gwasvcf(dat, out, chr_col, pos_col, nea_col, ea_col,
-                  eaf_col = eaf_col, beta_col = beta_col, se_col = se_col,
-                  pval_col = pval_col, n = n, n_case = n_case, name = name,
+                  snp_col = snp_col, eaf_col = eaf_col, beta_col = beta_col,
+                  se_col = se_col, pval_col = pval_col, n = n, n_case = n_case,
+                  name = name,
                   verbose = verbse)
   }, mc.cores = cores)
 
@@ -71,6 +73,7 @@ dat_to_gwasvcf <- function(dat,
                            pos_col,
                            nea_col,
                            ea_col,
+                           snp_col = NULL,
                            eaf_col = NULL,
                            beta_col = NULL,
                            se_col = NULL,
@@ -87,19 +90,19 @@ dat_to_gwasvcf <- function(dat,
   # Check if these are columns or single values
   # Unsure if this is necessary or whether the gwasvcf::create_vcf can handle
   # this by itself without any pre-cleaning...
-  if (n %in% names(dat)) {
+  if (!is.null(n) && n %in% names(dat)) {
     n_col <- n
   } else {
     n_col <- NA
   }
 
-  if (n_case %in% names(dat)) {
+  if (!is.null(n_case) && n_case %in% names(dat)) {
     ncase_col <- n_case
   } else {
     ncase_col <- NA
   }
 
-  if (name %in% names(dat)) {
+  if (!is.null(name) && name %in% names(dat)) {
     name_col <- name
   } else {
     name_col <- NA
