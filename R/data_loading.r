@@ -110,19 +110,18 @@ dat_to_gwasvcf <- function(dat,
 
   attempt <- tryCatch(
     expr = {
-      vcf <- dat %$%
-        gwasvcf::create_vcf(chrom = chr_col,
-                            pos = pos_col,
-                            nea = nea_col,
-                            ea = ea_col,
-                            snp = snp_col,
-                            ea_af = eaf_col,
-                            effect = beta_col,
-                            se = se_col,
-                            pval = pval_col,
-                            n = ifelse(is.na(n_col), n, n_col),
-                            ncase = ifelse(is.na(ncase_col), n_case, ncase_col),
-                            name = ifelse(is.na(name_col), name, name_col))
+      vcf <- gwasvcf::create_vcf(chrom = dat[[chr_col]],
+                            pos = dat[[pos_col]],
+                            nea = dat[[nea_col]],
+                            ea = dat[[ea_col]],
+                            snp = dat[[snp_col]],
+                            ea_af = dat[[eaf_col]],
+                            effect = dat[[beta_col]],
+                            se = dat[[se_col]],
+                            pval = dat[[pval_col]],
+                            n = ifelse(is.na(n_col), n, dat[[n_col]]),
+                            ncase = ifelse(is.na(ncase_col), n_case, dat[[ncase_col]]),
+                            name = ifelse(is.na(name_col), name, dat[[name_col]]))
     },
     error = function(e) {
       .print_msg(paste0("Error creating vcf:"), verbose)
