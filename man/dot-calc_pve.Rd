@@ -2,8 +2,7 @@
 % Please edit documentation in R/analyses.r
 \name{.calc_pve}
 \alias{.calc_pve}
-\title{Calculates proportion of variance explained
-From https://doi.org/10.1371/journal.pone.0120758 S1 Text}
+\title{Calculate PVE}
 \usage{
 .calc_pve(b, maf, se, n)
 }
@@ -20,6 +19,7 @@ From https://doi.org/10.1371/journal.pone.0120758 S1 Text}
 Vector or number, proportion of variance explained
 }
 \description{
-Calculates proportion of variance explained
-From https://doi.org/10.1371/journal.pone.0120758 S1 Text
+Calculates proportion of variance explained.
+From \href{https://doi.org/10.1371/journal.pone.0120758}{S1 Text}
 }
+\keyword{Internal}

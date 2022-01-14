@@ -2,28 +2,52 @@
 % Please edit documentation in R/analyses.r
 \name{do_coloc}
 \alias{do_coloc}
-\title{Runs colocalisation using the coloc R package's coloc.abf function}
+\title{Run colocalisation analyses}
 \usage{
-do_coloc(dat, id1, id2, report, window = 400, chrpos = "", nthreads = 1)
+do_coloc(
+  dat,
+  method = "coloc.abf",
+  coloc_window = 5e+05,
+  bfile = NULL,
+  plink = NULL,
+  pwcoco = NULL,
+  workdir = tempdir(),
+  cores = 1,
+  verbose = TRUE
+)
 }
 \arguments{
 \item{dat}{A data.frame of harmonised data}
 
-\item{id1}{DatasetsID class of exposure IDs}
+\item{method}{Which method of colocalisation to use: coloc.abf, coloc.susie, pwcoco (Optional)}
 
-\item{id2}{DatasetsID class of outcome IDs}
+\item{coloc_window}{Size (+/-) of region to extract for colocalisation analyses (Optional)}
 
-\item{report}{QCReport class of results, etc. for reporting}
+\item{bfile}{Path to Plink bed/bim/fam files (Optional)}
 
-\item{window}{Region to extract SNPs from, either side of lead SNP,
-default: 400kb}
+\item{plink}{Path to Plink binary (Optional)}
 
-\item{chrpos}{Chromosome position to search for SNPs, default uses region
-around lead SNP but can be overwritten if provided}
+\item{pwcoco}{If PWCoCo is the selected coloc method, path to PWCoCo binary (Optional)}
 
-\item{nthreads}{Number of threads for use in multithreaded functions,
-default: 1}
+\item{workdir}{Path to save temporary files (Optional)}
+
+\item{cores}{Number of cores for multi-threaded tasks (Optional)
+NB: Unavailable on Windows machines}
+
+\item{verbose}{Display verbose information (Optional, boolean)}
+}
+\value{
+A data.frame of colocalistion results
 }
 \description{
-Runs colocalisation using the coloc R package's coloc.abf function
+Runs colocalisation using any of the following methods:
+\enumerate{
+\item Coloc.abf, see coloc::coloc.abf()
+\item Coloc.susie, see coloc::coloc.susie()
+\item PWCoCo, see \href{https://github.com/jwr-git/pwcoco}{PWCoCo}
+}
+NB: PWCoCo is not available on Windows.
+}
+\seealso{
+[coloc::coloc.abf()], [coloc::coloc.susie()]
 }

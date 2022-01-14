@@ -2,20 +2,19 @@
 % Please edit documentation in R/analyses.r
 \name{.wr_taylor_approx}
 \alias{.wr_taylor_approx}
-\title{Calculates the second term Taylor approximation for standard error of
-the Wald ratio method.
-From https://doi.org/10.1101/2021.03.01.433439 supplementary}
+\title{WR Taylor Approx of SE}
 \usage{
 .wr_taylor_approx(dat)
 }
 \arguments{
-\item{object}{Data.frame or vector}
+\item{object}{Harmonised data.frame}
 }
 \value{
-Appended result
+Results data.frame
 }
 \description{
 Calculates the second term Taylor approximation for standard error of
 the Wald ratio method.
-From https://doi.org/10.1101/2021.03.01.433439 supplementary
+From \href{https://doi.org/10.1101/2021.03.01.433439}{supplementary}
 }
+\keyword{Internal}

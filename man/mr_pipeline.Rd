@@ -4,51 +4,18 @@
 \alias{mr_pipeline}
 \title{Entry point for the pipeline.}
 \usage{
-mr_pipeline(
-  ids1,
-  ids2,
-  p_cutoff = 5e-08,
-  f_cutoff = 10,
-  chrompos_query = NULL,
-  gene_query = NULL,
-  markdown = T,
-  out_path = "",
-  out_name = "",
-  nthreads = 1,
-  bfile = NULL,
-  plink_bin = NULL,
-  ...
-)
+mr_pipeline(ids1, ids2, out_name = "", config_file = "", ...)
 }
 \arguments{
 \item{ids1}{IDs or filenames for summary statistics}
 
 \item{ids2}{IDs or filenames for summary statistics}
 
-\item{p_cutoff}{P value cutoff for "tophits" from summary statistics,
-default: 5e-8}
-
-\item{f_cutoff}{F-statistic cutoff for exposure data, default: 10}
-
-\item{chrompos_query}{Select SNPs within this region only,
-format: "chrom:start-end"}
-
-\item{gene_query}{Select SNPs nearby this gene only, NOT YET IMPLEMENTED}
-
-\item{markdown}{Generate markdown report, default: TRUE}
-
-\item{out_path}{Path to save markdown report, defaults to user home directory}
-
 \item{out_name}{Name of the analysis given to the markdown report,
 defaults to time and date}
 
-\item{nthreads}{Number of threads for use in multithreaded functions,
-default: 1}
-
-\item{bfile}{Plink 1.x format reference files for use in local clumping,
-etc, default: NULL}
-
-\item{plink_bin}{Plink 1.x location, default: NULL}
+\item{config_file}{Path to config.yml file. Defaults to file that comes with the
+package. Please see that file for more details.}
 
 \item{...}{Other arguments for plotting, NOT YET IMPLEMENTED}
 }

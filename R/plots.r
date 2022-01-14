@@ -1,298 +1,235 @@
-#' Plots F-statistic against P value
-#' UNIMPLEMENTED
-f_plot <- function(dat, report,
-                        beta_col = "beta.exposure",
-                        se_col = "se.exposure",
-                        pval_col = "pval.exposure",
-                        trait_col = "exposure",
-                        id_col = "id.exposure")
-{
-  # TODO Could probably do this in a more "R-way" -- apply?
-  for(trait in unique(get(trait_col, dat))) {
-    plot_dat <- subset(dat, get(trait_col) == trait)
-    id <- unique(plot_dat[[id_col]])
-
-    f <- ggplot2::ggplot(data = plot_dat, aes(x = !!sym(beta_col) / !!sym(se_col),
-                                                    y = -log10(!!sym(pval_col)))) +
-          geom_point(size = 2, alpha = 0.8) +
-          theme_bw() +
-          #theme(axis.title.x = element_blank(), axis.title.y = element_blank(),
-          #      legend.position = c(0.9, 0.9), legend.background = element_rect(size=0.5, linetype="solid",
-          #                                                                      colour ="darkgrey"),
-          #      panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
-          #      legend.text=element_text(size=20), legend.title = element_text(size=20)) +
-          geom_vline(xintercept = 0.0, col = "black", linetype = "dotted") +
-          geom_hline(yintercept = -log10(5e-8), col = "darkgrey", linetype = "twodash", size = 1) +
-          xlab("Beta / SE") +
-          ylab("-log10(P value)") +
-          ggtitle(paste0("Plot of F-statistic against P value for ",trait)) +
-          stat_smooth(method = "lm", formula = y ~ poly(x, 2), alpha = 0.5, colour = "grey")
-
-    report$add_plot(list(id1 = id,
-                         id2 = NA,
-                         name1 = unique(plot_dat[[trait_col]]),
-                         name2 = "",
-                         type = "f"),
-                    f)
-  }
-}
-
-#' Creates Z-score plot for SNPs
+#' Z plot
 #'
-#' @param dat A data.frame of harmonised data
+#' Creates a Z-score plot for SNPs, where \eqn{Z = b / SE}.
+#' This should follow a parabollic shape and so can be used to find certain
+#' SNPs which may not follow this shape.
+#' If `plotly` is installed, the plot will be returned interactive.
+#'
+#' @param dat A data.frame of data
+#' @param snp_col Column of SNP names (Optional)
+#' @param beta_col Column of MR beta estimates (Optional)
+#' @param se_col Column of standard errors for the beta estimates (Optional)
+#' @param pval_col Column of P values (Optional)
+#' @param force_static True for forcing the plot to be returned as a static plot (Optional)
 #'
 #' @return Plot
-interactive_z_plot <- function(dat)
+#' @export
+z_plot <- function(dat,
+                   snp_col = "SNP",
+                   beta_col = "beta.exposure",
+                   se_col = "se.exposure",
+                   pval_col = "pval.exposure",
+                   force_static = FALSE)
 {
-  f <- ggplot2::ggplot(data = dat, aes(x = beta.exposure / se.exposure,
-                                            y = -log10(pval.exposure))) +
-    geom_point(size = 2, alpha = 0.8, aes(text = sprintf("SNP: %s", SNP))) +
-    theme_bw() +
+  if (nrow(dat) < 1 || length(dat) < 1) {
+    warning("\"dat\" is empty or lacks data. Please check before continuing.")
+    return(NA)
+  }
+
+  if (!require("plotly") && !force_static) {
+    warning("plotly not found! Plot will be static. Please install plotly for interactive plots.")
+  }
+
+  if (!(snp_col %in% names(dat))
+      || !(beta_col %in% names(dat))
+      || !(se_col %in% names(dat))
+      || !(pval_col %in% names(dat))) {
+    warning("Could not find SNP, beta, SE or P value column in dat. Please check this before continuing.")
+    return(NA)
+  }
+
+  p <- ggplot2::ggplot(data = dat, aes(x = get(beta_col) / get(se_col),
+                                       y = -log10(get(pval_col)))) +
+    ggplot2::geom_point(size = 2, alpha = 0.8, aes(text = sprintf("SNP: %s", get(snp_col)))) +
+    ggplot2::theme_bw() +
     #theme(axis.title.x = element_blank(), axis.title.y = element_blank(),
     #      legend.position = c(0.9, 0.9), legend.background = element_rect(size=0.5, linetype="solid",
     #                                                                      colour ="darkgrey"),
     #      panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
     #      legend.text=element_text(size=20), legend.title = element_text(size=20)) +
-    geom_vline(xintercept = 0.0, col = "black", linetype = "dotted") +
-    geom_hline(yintercept = -log10(5e-8), col = "darkgrey", linetype = "twodash", size = 1) +
-    xlab("Beta / SE") +
-    ylab("-log10(P value)") +
-    ggtitle(paste0("Plot of Z scores against P value")) +
-    stat_smooth(method = "lm", formula = y ~ poly(x, 2), alpha = 0.5, colour = "grey")
-
-  return(f)
-}
-
-#' Plots Volcano plot
-#' UNIMPLEMENTED
-volcano_plot <- function(res, report)
-{
-  if (!nrow(res) || !length(res)) {
-    return()
-  }
-
-  id.exposure <- unique(res[["id.exposure"]])
-  id.outcome <- unique(res[["id.outcome"]])
-  exposure <- unique(res[["exposure"]])
-  outcome <- unique(res[["outcome"]])
-
-  if (is.na(id.exposure) || !nrow(res)) {
-    return()
-  }
-
-  p <- ggplot2::ggplot(data = res, aes(x = b, y = -log10(pval), label = outcome)) +
-    ggplot2::geom_point(aes(text = sprintf("SNP: %s", snp)), size=2) +
-    #ggrepel::geom_label_repel(box.padding=0.35,
-    #                 point.padding=0.5,
-    #                 size=6,
-    #                 segment.colour="grey50") +
-    ggplot2::theme_bw() +
-    ggplot2::xlab("ln(Odds ratio)") +
-    ggplot2::ylab("-log10(P value)")
-
-  report$add_plot(list(id1 = id.exposure,
-                       id2 = id.outcome,
-                       name1 = exposure,
-                       name2 = outcome,
-                       type = "volcano"),
-                  p)
-}
-
-#' Plots and returns an interactive volcano plot
-#'
-#' @param dat A data.frame of harmonised data
-#'
-#' @return Plot
-interactive_volcano_plot <- function(dat)
-{
-  if (!nrow(dat) || !length(dat)) {
-    return()
-  }
-
-  r <- dat %>%
-    TwoSampleMR::mr_singlesnp() %>%
-    TwoSampleMR::generate_odds_ratios() %>%
-    dplyr::filter(!startsWith(getElement(., "SNP"), "All"))
-
-  p <- r %>%
-    plotly::highlight_key(~outcome) %>%
-    plotly::plot_ly(
-      x = ~b, y = ~-log10(p),
-      type = 'scatter',
-      mode = "markers+text",
-      textposition = "top",
-      hovertemplate = paste(
-        "<b>", r$SNP, " : ", r$outcome, "</b><br><br>",
-        "MR Beta = %{x:.2f}<br>",
-        "OR (95% CI) = ", signif(r$or, 3), "(", signif(r$or_lci95, 3), ",", signif(r$or_uci95, 3), ")"
-        )
-    ) %>%
-    plotly::highlight(on = "plotly_click", selectize = TRUE, dynamic = TRUE)
-
-  return(p)
-}
-
-#' Plots a PheWAS-like plot of all exposures against one outcome
-#'
-#' @param res A data.frame of results from MR
-#' @param report QCReport class of results, etc. for reporting
-#'
-#' @return NULL
-phewas_plot <- function(res, report)
-{
-  if (!nrow(res)) {
-    return()
-  }
-
-  id <- unique(res[["id.outcome"]])
-  name <- unique(res[["outcome"]])
-  res <- res[res$method %in% c("Wald ratio", "Inverse variance weighted"), ]
-
-  if (is.na(id) || nrow(res) < 2) {
-    return()
-  }
-
-  p <- res %>%
-    dplyr::mutate(or = scale(or)) %>%
-    ggplot2::ggplot(data = res, mapping = aes(x = outcome, y = -log10(pval), size = or)) +
-    ggplot2::geom_point() +
-    ggplot2::scale_size_binned() +
-    ggplot2::theme_bw() +
-    ggplot2::xlab("Outcome") +
+    ggplot2::geom_vline(xintercept = 0.0, col = "black", linetype = "dotted") +
+    ggplot2::geom_hline(yintercept = -log10(5e-8), col = "darkgrey", linetype = "twodash", size = 1) +
+    ggplot2::xlab("Beta / SE") +
     ggplot2::ylab("-log10(P value)") +
-    ggplot2::labs(size = "Standardised OR")
+    ggplot2::ggtitle(paste0("Plot of Z scores against P value")) +
+    ggplot2::stat_smooth(method = "lm", formula = y ~ poly(x, 2), alpha = 0.5, colour = "grey")
 
-  report$add_plot(list(id1 = NA,
-                       id2 = id,
-                       name1 = name,
-                       name2 = "",
-                       type = "phewas"),
-                  p)
-}
-
-#' Plots a regional plot of the area being tested for colocalisation
-#'
-#' @param dat A data.frame of harmonised data
-#' @param exposure Character, name of exposure
-#' @param outcome Character, name of outcome
-#' @param bfile Path to Plink bed/bim/fam files
-#' @param plink Path to Plink binary
-#' @param verbose Print messages or not
-#'
-#' @return NULL
-regional_plot <- function(dat, exposure, outcome, bfile = NULL, plink = NULL, verbose = TRUE)
-{
-  p <- NA
-  if (require("gassocplot"))
-  {
-    tryCatch(
-      expr = {
-        dat <- gwasglue::coloc_to_gassocplot(dat, bfile = bfile, plink_bin = plink)
-        p <- gassocplot::stack_assoc_plot(dat$markers, dat$z, dat$corr, traits = dat$traits)
-
-        # Annotate titles
-        # TODO Better way of referencing these than hard-coded numbers?
-        tryCatch({
-          p$grobs[[1]]$grobs[[22]]$label <- exposure # Top
-          p$grobs[[1]]$grobs[[65]]$label <- outcome # Bottom
-        })
-
-        # a <- grid.grabExpr(gassocplot::stack_assoc_plot(dat$markers, dat$z, dat$corr, traits = dat$traits)) %>%
-        # editGrob()
-      },
-      error = function(e) {
-        .print_msg(paste0("Could not generate regional plot for \"", exposure, "\" and \"", outcome, "\".)"), verbose = verbose)
-      }
-    )
+  if (require("plotly") && !force_static) {
+    p <- plotly::ggplotly(p)
   }
 
   return(p)
 }
 
-#' Plots a scatter plot of MR results
-#' UNIMPLEMENTED
-mr_scatter_plot <- function(res, keys, dat, report)
-{
-  # Mapping went wrong or no results
-  if (!ncol(keys) || ncol(keys) > 2 || !nrow(res))
-  {
-    return()
-  }
-
-  # Subset using the mapping IDs
-  dat <- dat[dat$id.exposure == keys[[1]] & dat$id.outcome == keys[[2]],]
-
-  # Not enough SNPs to plot?
-  if (nrow(dat) < 2)
-  {
-    report$add_plot(list(id1 = keys[[1]],
-                         id2 = keys[[2]],
-                         name1 = "",
-                         name2 = "",
-                         type = "scatter"), NA)
-  }
-
-  # Plot!
-  p <- TwoSampleMR::mr_scatter_plot(res, dat)
-  report$add_plot(list(id1 = keys[[1]],
-                       id2 = keys[[2]],
-                       name1 = "",
-                       name2 = "",
-                       type = "scatter"),
-                  p)
-}
-
-#' Plots an interactive scatter plot of SNP-exposure and SNP-outcome effects
+#' Volcano plot
 #'
-#' @param dat A data.frame of harmonised data
-#' @param id.exposure Exposure ID
-#' @param id.outcome Outcome ID
+#' Creates a volcano plot of Wald ratios from [do_mr()].
+#' This function will take all of the Wald ratios in the given data.frame and plot these.
+#' If the plot is too crowded, subsetting the results before passing them to this plotter will help.
+#' If `plotly` is installed, the plot will be returned interactive.
+#'
+#' @param res A data.frame of MR results
+#' @param label Column whose values will be used to group results by (Optional)
+#' @param snp_col Column name for SNPs (Optional)
+#' @param beta_col Column name for beta (Optional)
+#' @param pval_col Column name for P value (Optional)
+#' @param or_col Column name for odds ratio (Optional)
+#' @param or_lci_col Column name for lower CI of OR (Optional)
+#' @param or_uci_col Column name for upper CI of OR (Optional)
+#' @param method_col Column name which contains the MR method (Optional)
+#' @param force_static True for forcing the plot to be returned as a static plot (Optional)
 #'
 #' @return Plot
-interactive_scatter_plot <- function(dat, id.exposure, id.outcome)
+#' @export
+volcano_plot <- function(res,
+                         label = "outcome",
+                         snp_col = "snp",
+                         beta_col = "b",
+                         pval_col = "pval",
+                         or_col = "or",
+                         or_lci_col = "or_lci95",
+                         or_uci_col = "or_uci95",
+                         method_col = "method",
+                         force_static = FALSE)
 {
-  # Each unique pair of traits need to be colocalised
-  subdat <- dat[dat$id.exposure == id.exposure & dat$id.outcome == id.outcome, ]
-
-  if (!length(subdat)) {
-    return(NULL)
+  if (nrow(res) < 1 || length(res) < 1) {
+    warning("\"res\" is empty or lacks data. Please check before continuing.")
+    return(NA)
   }
 
-  f <- ggplot2::ggplot(data = subdat, aes(x = beta.exposure,
-                                          y = beta.outcome)) +
-    geom_point(size = 2, alpha = 0.8, aes(text = sprintf("SNP: %s", SNP))) +
-    geom_errorbar(alpha = 0.3,
-                  width = 0.001,
-                  aes(ymin = beta.outcome - 1.96 * se.outcome,
-                      ymax = beta.outcome + 1.96 * se.outcome)) +
-    geom_errorbarh(alpha = 0.3,
-                   height = 0.001,
-                   aes(xmin = beta.exposure - 1.96 * se.exposure,
-                       xmax = beta.exposure + 1.96 * se.exposure)) +
-    theme_bw() +
-    geom_vline(xintercept = 0.0, col = "black", linetype = "dashed") +
-    geom_hline(yintercept = 0.0, col = "darkgrey", linetype = "dashed") +
-    xlab("Exposure Beta") +
-    ylab("Outcome Beta") +
-    ggtitle(paste0("Plot of SNP effects on Exposure vs Outcome"))
+  res <- res[res[[method_col]] == "Wald ratio", ]
+  if (nrow(res) < 1 || length(res) < 1) {
+    warning("\"res\" is empty or lacks data after attempting to find Wald ratios. Please check before continuing.")
+    return(NA)
+  }
 
-  return(f)
+  if (require(plotly) && !force_static) {
+    p <- res %>%
+      plotly::highlight_key(~res[[label]]) %>%
+      plotly::plot_ly(
+        x = ~res[[beta_col]], y = ~-log10(res[[pval_col]]),
+        type = 'scatter',
+        mode = "markers+text",
+        textposition = "top",
+        hovertemplate = paste(
+          "<b>", res[[snp_col]], " : ", res[[label]], "</b><br><br>",
+          "MR Beta = %{x:.2f}<br>",
+          "OR (95% CI) = ", signif(res[[or_col]], 3), "(", signif(res[[or_lci_col]], 3), ",", signif(res[[or_uci_col]], 3), ")"
+        )
+      ) %>%
+      plotly::highlight(on = "plotly_click", selectize = TRUE, dynamic = TRUE) %>%
+      plotly::layout(title = "Volcano plot of Wald ratios",
+                     xaxis = list(title = "Beta estimate"),
+                     yaxis = list(title = "-log10(P)"))
+  } else {
+    p <- ggplot2::ggplot(data = res, aes(x = get(beta_col), y = -log10(get(pval_col)))) +
+      ggplot2::geom_point(size = 2, alpha = 0.8, aes(color = get(label))) +
+      ggplot2::scale_colour_viridis_d("Outcomes") +
+      ggplot2::scale_fill_viridis_d("Outcomes") +
+      ggplot2::theme_bw() +
+      ggplot2::xlab("Beta") +
+      ggplot2::ylab("-log10(P value)") +
+      ggplot2::ggtitle("Volcano plot of Wald ratios")
+  }
+
+  return(p)
 }
 
-#' Forest plot of MR results
-#' UNIMPLEMENTED
-forest_plot <- function(res, dat, report)
+#' Forest plot
+#'
+#' Creates a forest plot of MR estimates from do_mr().
+#' Will plot both the Wald ratios for all SNPs which form the instrument and
+#' inverse variance weighted method. However, if you wish for only the "discovery"
+#' results to be plotted (i.e. WR for single-SNP instruments and only IVW for
+#' multi-SNP instruments), then setting `plot_all_res` to \code{FALSE} will achieve this.
+#' If the plot is too crowded, subsetting the results before passing them to this plotter will help.
+#'
+#' @seealso [do_mr()]
+#'
+#' @param res A data.frame of MR results
+#' @param snp_col Column name for SNPs (Optional)
+#' @param beta_col Column name for beta (Optional)
+#' @param se_col Column name for standard error (Optional)
+#' @param pval_col Column name for P value (Optional, unused for now)
+#' @param or_col Column name for odds ratio (Optional)
+#' @param or_lci_col Column name for lower CI of OR (Optional)
+#' @param or_uci_col Column name for upper CI of OR (Optional)
+#' @param method_col Column name which contains the MR method (Optional)
+#' @param exposure_col Column name for exposure names (Optional)
+#' @param outcome_col Column name for outcome names (Optional)
+#' @param plot_all_res For multi-SNP instruments, also plot the Wald ratios for
+#'                     all SNPs (\code{TRUE}) or just the inverse variance weighted
+#'                     result (\code{FALSE}).
+#'
+#' @return Plot
+#' @export
+forest_plot <- function(res,
+                        snp_col = "snp",
+                        beta_col = "b",
+                        se_col = "se",
+                        pval_col = NULL,
+                        or_col = "or",
+                        or_lci_col = "or_lci95",
+                        or_uci_col = "or_uci95",
+                        method_col = "method",
+                        exposure_col = "exposure",
+                        outcome_col = "outcome",
+                        plot_all_res = TRUE)
 {
-  if (!nrow(res) || !length(res)) {
-    return()
+  if (nrow(res) < 1 || length(res) < 1) {
+    warning("\"res\" is empty or lacks data. Please check before continuing.")
+    return(NA)
   }
 
-  #res <- res[res$method %in% c("Wald ratio", "Inverse variance weighted"), ]
+  # If !plot_all_res, then we plot only IVW or WR if only one result
+  # Otherwise, all results are plotted in the "summary" style
+  if (!plot_all_res) {
+    to_plot <- res %>%
+      dplyr::group_by(dplyr::across(dplyr::all_of(c(exposure_col, outcome_col)))) %>%
+      dplyr::mutate(.n = n()) %>%
+      dplyr::mutate(.plot = ifelse(.n ==1 | (!!sym(method_col)) == "Inverse variance weighted", TRUE, FALSE))
 
-  #if (!nrow(res)) {
-  #  return()
-  #}
+    if (all(to_plot$.plot== FALSE)) {
+      warning("No data retained from using plot_all_res, consider changing this or checking your result.")
+      return(NA)
+    }
 
+    # Some aesthetics
+    to_plot$label <- to_plot[[snp_col]]
+    to_plot <- to_plot[to_plot$.plot == TRUE, ]
+    to_plot$shape <- 1
+  } else {
+    to_plot <- res
+
+    # Some aesthetics
+    to_plot$label <- ifelse(to_plot[[method_col]] == "Inverse variance weighted",
+                            "Inverse variance weighted",
+                            to_plot[[snp_col]])
+    to_plot$shape <- ifelse(to_plot[[method_col]] == "Inverse variance weighted",
+                            5,
+                            1)
+  }
+
+  p <- to_plot %>%
+    dplyr::arrange((!!exposure_col), (!!outcome_col), desc(label)) %>%
+    ggplot2::ggplot(data = .,
+                       aes(x = get(or_col),
+                           y = label,
+                           group = interaction(get(exposure_col), get(outcome_col)))) +
+    geom_point(aes(shape = as.factor(shape))) +
+    geom_errorbarh(aes(xmin = get(or_lci_col), xmax = get(or_uci_col))) +
+    geom_vline(xintercept = 1, lty = 2) +
+    facet_grid(as.formula(paste(outcome_col, "+", exposure_col, "~.")), scales = "free", space = "free") +
+    xlab("Odds Ratio (95% CI)") +
+    ylab(" ") +
+    theme_bw()
+
+  return(p)
+}
+
+# Testing
+forest_plot_single <- function()
+{
   # Reverse order of res so that WR are first followed by IVW
   res <- res[seq(dim(res)[1], 1), ]
 
@@ -388,11 +325,6 @@ forest_plot <- function(res, dat, report)
 
   gt <- ggplot_gtable(ggplot_build(p))
   gt$layout$clip[gt$layout$name == "panel"] <- "off"
-
-  report$add_plot(list(id1 = id,
-                       id2 = NA,
-                       name1 = name,
-                       name2 = "",
-                       type = "forest"),
-                  gt)
+  g <- grid::grid.draw(gt)
+  return(g)
 }

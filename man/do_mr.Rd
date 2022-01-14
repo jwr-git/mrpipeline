@@ -2,22 +2,30 @@
 % Please edit documentation in R/analyses.r
 \name{do_mr}
 \alias{do_mr}
-\title{Runs Mendelian randomisation and related analyses, including heterogeneity,
-Steiger filtering and pleiotropy analyses.
-Also generates a number of plots, e.g. volcano plots, for MR results.}
+\title{Run Mendelian randomisation analyses}
 \usage{
-do_mr(dat, report)
+do_mr(dat, f_cutoff = 10, all_wr = TRUE, verbose = TRUE)
 }
 \arguments{
 \item{dat}{A data.frame of harmonised data}
 
-\item{report}{QCReport class of results, etc. for reporting}
+\item{f_cutoff}{Define an F-statistic cutoff (Optional)}
+
+\item{all_wr}{Should the Wald ratio be calculated for all SNPs, even if IVW can be used? (Optional)}
+
+\item{verbose}{Display verbose information (Optional, boolean)}
 }
 \value{
 A data.frame of MR results
 }
 \description{
-Runs Mendelian randomisation and related analyses, including heterogeneity,
-Steiger filtering and pleiotropy analyses.
-Also generates a number of plots, e.g. volcano plots, for MR results.
+Runs Mendelian randomisation and related analyses:
+\enumerate{
+\item Wald ratio, see \link[mrpipeline]{.wr_taylor_approx()}
+\item Inverse variance weighted, see \link[mrpipeline]{.ivw.delta()}
+\item Steiger filtering, see TwoSampleMR::directionality_test()
+}
+}
+\seealso{
+[.wr_taylor_approx()], [.ivw_delta()], [TwoSampleMR::directionality_test()]
 }

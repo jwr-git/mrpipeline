@@ -1,25 +1,30 @@
-# Structure
-# 1. Prepare and clean data
-# - Function to load and prepare OpenGWAS IDs
-# - Function to load and prepare gwasvcf files
-# - Annotate data:
-# -- ENSGs -> gene names
-# -- Gene names -> ENSGs
-# -- Diseases -> EFO
-# -- EFo -> disease
-# --
-# 2. Harmonise data
-# - F-statistic cutoff into harmonisation
-# - Plotting data at this stage?
-# 3. MR
-# - WR Taylor expansion
-# - IVW delta
-# - Plots
-# 4. Coloc
-# - Coloc with SuSiE
-# - PWCoCo
-# 5. Report
-
+#' Convert file(s) to gwasvcf format.
+#'
+#' Function to convert a file (or files) to gwasvcf format.
+#' @seealso [dat_to_gwasvcf()] for converting data.frames
+#'
+#' @param file Path to file
+#' @param chr_col Column name for chromosome
+#' @param pos_col Column name for position
+#' @param nea_col Column name for non-effect allele
+#' @param ea_col Column name for effect allele
+#' @param snp_col Column name for SNP (Optional)
+#' @param eaf_col Column name for effect allele frequency (Optional)
+#' @param beta_col Column name for beta (Optional)
+#' @param se_col Column name for standard error (Optional)
+#' @param pval_col Column name for P value (Optional)
+#'                 NB: P values will be saved as 10^-P
+#' @param n Sample size (Optional), can be int or column name
+#' @param n_case Number of cases (Optional), can be int or column name
+#' @param name Trait name (Optional), can be string or column name
+#' @param header Whether file has a header or not (Optional, boolean)
+#' @param sep File separater (Optional)
+#' @param cores Number of cores for multi-threaded tasks (Optional)
+#'              NB: Unavailable on Windows machines
+#' @param verbose Display verbose information (Optional, boolean)
+#'
+#' @return gwasvcf object(s)
+#' @export
 file_to_gwasvcf <- function(file,
                             chr_col,
                             pos_col,
@@ -67,6 +72,30 @@ file_to_gwasvcf <- function(file,
   return(outputs)
 }
 
+#' Convert data.frame to gwasvcf format.
+#'
+#' Function to convert a data.frame to gwasvcf format.
+#' @seealso [file_to_gwasvcf()] for converting files.
+#'
+#' @param dat Data.frame
+#' @param out Path to save output
+#' @param chr_col Column name for chromosome
+#' @param pos_col Column name for position
+#' @param nea_col Column name for non-effect allele
+#' @param ea_col Column name for effect allele
+#' @param snp_col Column name for SNP (Optional)
+#' @param eaf_col Column name for effect allele frequency (Optional)
+#' @param beta_col Column name for beta (Optional)
+#' @param se_col Column name for standard error (Optional)
+#' @param pval_col Column name for P value (Optional)
+#'                 NB: P values will be saved as 10^-P
+#' @param n Sample size (Optional), can be int or column name
+#' @param n_case Number of cases (Optional), can be int or column name
+#' @param name Trait name (Optional), can be string or column name
+#' @param verbose Display verbose information (Optional, boolean)
+#'
+#' @return gwasvcf object
+#' @export
 dat_to_gwasvcf <- function(dat,
                            out,
                            chr_col,
@@ -133,6 +162,11 @@ dat_to_gwasvcf <- function(dat,
   return(out)
 }
 
+#' Helper function for message printing.
+#'
+#' @param msg Message
+#' @param verbose Display message or suppress
+#' @keywords Internal
 .print_msg <- function(msg, verbose)
 {
   if (verbose == TRUE) {
@@ -140,6 +174,28 @@ dat_to_gwasvcf <- function(dat,
   }
 }
 
+#' Read exposures
+#'
+#' Read a dataset (or datasets) as exposure.
+#' Can accept both OpenGWAS IDs or file paths. Accepts only gwasvcf file formats.
+#' This function can clump data locally, if supplied with the `plink` and `bfile`
+#' arguments. If these are not supplied, clumping will take place on the
+#' OpenGWAS servers \emph{only} for OpenGWAS IDs.
+#' If you would like to clump local files, please provide paths to Plink and bfiles.
+#'
+#' @param ids List of OpenGWAS IDs or file paths (to gwasvcf files)
+#' @param pval Threshold to extract SNPs (Optional)
+#' @param plink Path to Plink binary (Optional)
+#' @param bfile Path to Plink .bed/.bim/.fam files (Optional)
+#' @param clump_r2 r2 threshold for clumping SNPs (Optional)
+#' @param clump_kb Distance outside of which SNPs are considered in linkage equilibrium (Optional)
+#' @param pop Population (Optional, used only for clumping on OpenGWAS)
+#' @param cores Number of cores for multi-threaded tasks (Optional)
+#'              NB: Unavailable on Windows machines
+#' @param verbose Display verbose information (Optional, boolean)
+#'
+#' @return Data.frame of exposure datasets
+#' @export
 read_exposure <- function(ids,
                           pval = 5e-8,
                           plink = NULL,
@@ -165,6 +221,28 @@ read_exposure <- function(ids,
   return(exp)
 }
 
+#' Read outcomes
+#'
+#' Read a dataset (or datasets) as outcome.
+#' Can accept both OpenGWAS IDs or file paths. Accepts only gwasvcf file formats.
+#' This function can search for proxy SNPs locally, if supplied with the `plink`
+#' and `bfile` arguments. If these are not supplied, proxy searching will take
+#' place on the OpenGWAS servers \emph{only} for OpenGWAS IDs.
+#' If you would like to search for proxies locally, please provide paths to Plink
+#' and bfiles.
+#'
+#' @param ids List of OpenGWAS IDs or file paths (to gwasvcf files)
+#' @param rsids List of SNP rsIDs to extract
+#' @param proxies Whether to search for proxies (Optional, boolean)
+#' @param proxy_rsq R2 threshold to use when searching for proxies (Optional)
+#' @param plink Path to Plink binary (Optional)
+#' @param bfile Path to Plink .bed/.bim/.fam files (Optional)
+#' @param cores Number of cores for multi-threaded tasks (Optional)
+#'              NB: Unavailable on Windows machines
+#' @param verbose Display verbose information (Optional, boolean)
+#'
+#' @return Data.frame of outcome datasets
+#' @export
 read_outcome <- function(ids,
                          rsids,
                          proxies = TRUE,
@@ -186,6 +264,30 @@ read_outcome <- function(ids,
   return(out)
 }
 
+#' Read datasets
+#'
+#' Helper function that is called from \link[mrpipeline]{read_exposure} and \link[mrpipeline]{read_outcome}.
+#' Extracts exposure and outcome data according to arguments.
+#' Should not be called directly.
+#'
+#' @seealso [read_exposure()], [read_outcome()]
+#'
+#' @param ids List of OpenGWAS IDs or file paths (to gwasvcf files)
+#' @param rsids List of SNP rsIDs to extract
+#' @param pval Threshold to extract SNPs (Optional)
+#' @param proxies Whether to search for proxies (Optional, boolean)
+#' @param proxy_rsq R2 threshold to use when searching for proxies (Optional)
+#' @param plink Path to Plink binary (Optional)
+#' @param bfile Path to Plink .bed/.bim/.fam files (Optional)
+#' @param clump_r2 r2 threshold for clumping SNPs (Optional)
+#' @param clump_kb Distance outside of which SNPs are considered in linkage equilibrium (Optional)
+#' @param pop Population (Optional, used only for clumping on OpenGWAS)
+#' @param type Type of data (Optional, "exposure" or "outcome")
+#' @param cores Number of cores for multi-threaded tasks (Optional)
+#'              NB: Unavailable on Windows machines
+#' @param verbose Display verbose information (Optional, boolean)
+#'
+#' @return Data.frame of datasets
 .read_dataset <- function(ids,
                           rsids = NULL,
                           pval = 5e-8,
@@ -330,6 +432,19 @@ read_outcome <- function(ids,
   return(dat)
 }
 
+#' Convert ENSG IDs -> gene names
+#'
+#' Attempts to convert ENSG IDs to gene names (hgnc_symbol).
+#' This is attempting using biomaRt's service and thus requires the optional
+#' biomaRt package to be installed.
+#'
+#' @param dat Data.frame of data
+#' @param ensg_col Column name containing ENSG IDs (Optional)
+#' @param new_col Column to append to `dat` with converted names (Optional)
+#' @param build Genomic build (Optional)
+#'
+#' @return Data.frame with appended column for names
+#' @keywords Internal
 .ensg_to_name <- function(dat,
                           ensg_col = "trait",
                           new_col = "hgnc_symbol",
@@ -379,6 +494,19 @@ read_outcome <- function(ids,
   return(dat)
 }
 
+#' Annotate ENSG IDs with gene names
+#'
+#' Attempts to convert ENSG IDs to gene names (hgnc_symbol).
+#' This is attempting using biomaRt's service and thus requires the optional
+#' biomaRt package to be installed.
+#'
+#' @param dat Data.frame of data
+#' @param col Column name containing ENSG IDs (Optional)
+#' @param gene_name_col Column to append to `dat` with converted names (Optional)
+#' @param build Genomic build (Optional)
+#'
+#' @return Data.frame with appended column for names
+#' @export
 annotate_ensg <- function(dat,
                           column = "exposure",
                           gene_name_col = "hgnc_symbol",
@@ -397,6 +525,18 @@ annotate_ensg <- function(dat,
   return(dat)
 }
 
+#' Annotate diseases with EFO IDs
+#'
+#' Attempts to annotate disease names with EFO IDs using the
+#' `epigraphdb` package.
+#' Note that the matching is fuzzy and some disease names will have multiple
+#' associated EFOs which may differ in definition slightly.
+#'
+#' @param dat Data.frame of data
+#' @param column Column name containing disease names
+#'
+#' @return Data.frame with appended column for EFO IDs
+#' @export
 annotate_efo <- function(dat,
                          column = "outcome")
 {
@@ -417,6 +557,30 @@ annotate_efo <- function(dat,
   return(dat)
 }
 
+#' Annotate cis/trans SNPs
+#'
+#' Attempts to annotate SNPs as cis or trans depending on their
+#' location to the gene coding region.
+#' This is achieved using the `biomaRt` R package.
+#'
+#' @param dat Data.frame of data
+#' @param cis_region Cis region definition (Optional, in kb)
+#' @param chr_col Column name for chromosome (Optional)
+#' @param pos_col Column name for position (Optional)
+#' @param snp_col Column name for SNP rsIDs (Optional)
+#' @param values_col Column name for gene names or ENSG IDs (Optional)
+#'                   NB: Choice must match the `filter` value
+#' @param filter How to search for genes in biomaRt, either:
+#'               \enumerate{
+#'               \item "ensembl_gene_id" for ENSG IDs, or
+#'               \item "hgnc_symbol" for gene names
+#'               }
+#'               (Optional)
+#' @param missing "Include" or "drop" SNPs which could not be matched (Optional)
+#' @param build Genomic build (Optional)
+#'
+#' @return Data.frame with appended column for cis/trans status
+#' @export
 cis_trans <- function(dat,
                       cis_region = 500000,
                       chr_col = "chr.exposure",
@@ -522,6 +686,18 @@ cis_trans <- function(dat,
   return(dat)
 }
 
+#' Harmonise exposure and outcomes.
+#'
+#' Wrapper function for \link[TwoSampleMR]{harmonise_data} function in the
+#' `TwoSampleMR` package.
+#' @seealso [TwoSampleMR::harmonise_data()]
+#'
+#' @param exposure Data.frame of exposure dataset(s)
+#' @param outcome Data.frame of outcome dataset(s)
+#' @param action How to harmonise alleles; see \link[TwoSampleMR]{harmonise_data}.
+#'
+#' @return Harmonised data.frame
+#' @export
 harmonise <- function(exposure,
                       outcome,
                       action = 2)

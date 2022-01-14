@@ -1,3 +1,5 @@
+#' Generate drug target evidence
+#'
 #' Uses the Drug Genome Interaction DB's API to search for drug target-related
 #' evidence, including on: Druggable Genome, Clinically Actionable and
 #' Drug Resistant ontologies.
@@ -8,6 +10,7 @@
 #' @param ensg_col Column, or name, to be accessed in `dat`
 #'
 #' @return data.frame of results
+#' @export
 drug_target_evidence <- function(dat,
                                  ensg_col = "exposure")
 {
@@ -37,11 +40,14 @@ drug_target_evidence <- function(dat,
   return(dgidb_res)
 }
 
+#' Link ENSG IDs with DGIdb
+#'
 #' Lookup ENSGs using the Drug Genome Interaction DB API.
 #'
 #' @param ensgs Vector of ENSG IDs
 #'
 #' @return data.frame of results
+#' @keywords Internal
 .dgidb_linkage <- function(ensgs)
 {
   interactions <- c("DRUGGABLE GENOME", "CLINICALLY ACTIONABLE", "DRUG RESISTANT")
@@ -76,6 +82,7 @@ drug_target_evidence <- function(dat,
 #' @param n Number of chunks to create
 #'
 #' @return list of chunks
+#' @keywords Internal
 .chunk <- function(x, n)
 {
   split(x, cut(seq_along(x), n, labels = FALSE))

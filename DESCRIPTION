@@ -12,5 +12,35 @@ Description: This package implements a pipeline which in turns allows for simple
 License: What license is it under?
 Encoding: UTF-8
 LazyData: true
-Imports: TwoSampleMR, ieugwasr, gwasglue, gwasvcf, tools, dplyr, ggplot2, gassocplot, grid, ggrepel, plotly
-RoxygenNote: 7.1.1
+Depends:
+  R (>= 4.0.0)
+Imports: 
+  TwoSampleMR, 
+  ieugwasr, 
+  gwasglue, 
+  gwasvcf,
+  epigraphdb,
+  coloc,
+  tools,
+  utils,
+  jsonlite,
+  dplyr, 
+  plyr,
+  tidyr,
+  tibble,
+  ggplot2, 
+  gassocplot,
+  parallel,
+  VariantAnnotation
+Remotes:
+  github::MRCIEU/TwoSampleMR
+  github::MRCIEU/ieugwasr
+  github::MRCIEU/gwasglue
+  github::MRCIEU/gwasvcf
+  github::MRCIEU/epigraphdb
+  github::jrs95/gassocplot
+  bioc::3.12/VariantAnnotation
+RoxygenNote: 7.1.2
+Suggests:
+  plotly,
+  biomaRt
