@@ -15,12 +15,14 @@ combine_results <- function(mr_res,
   }
 
   if (!all(mr_res.by %in% names(mr_res))) {
-    warning("Could not find column names in MR results data.frame: ", paste(names, collapse = ", "))
+    warning("Could not find column names in MR results data.frame: ", paste(mr_res.by, collapse = ", "))
   }
 
   if (!all(coloc_res.by %in% names(coloc_res.df))) {
-    warning("Could not find column names in coloc results data.frame: ",)
+    warning("Could not find column names in coloc results data.frame: ", paste(coloc_res.by, collapse = ", "))
   }
 
   merged <- base::merge(mr_res, coloc_res.df, by.x = mr_res.by, by.y = coloc_res.by, all.x = TRUE)
 }
+
+

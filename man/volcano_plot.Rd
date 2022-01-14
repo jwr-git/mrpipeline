@@ -2,12 +2,48 @@
 % Please edit documentation in R/plots.r
 \name{volcano_plot}
 \alias{volcano_plot}
-\title{Plots Volcano plot
-UNIMPLEMENTED}
+\title{Volcano plot}
 \usage{
-volcano_plot(res, report)
+volcano_plot(
+  res,
+  label = "outcome",
+  snp_col = "snp",
+  beta_col = "b",
+  pval_col = "pval",
+  or_col = "or",
+  or_lci_col = "or_lci95",
+  or_uci_col = "or_uci95",
+  method_col = "method",
+  force_static = FALSE
+)
+}
+\arguments{
+\item{res}{A data.frame of MR results}
+
+\item{label}{Column whose values will be used to group results by (Optional)}
+
+\item{snp_col}{Column name for SNPs (Optional)}
+
+\item{beta_col}{Column name for beta (Optional)}
+
+\item{pval_col}{Column name for P value (Optional)}
+
+\item{or_col}{Column name for odds ratio (Optional)}
+
+\item{or_lci_col}{Column name for lower CI of OR (Optional)}
+
+\item{or_uci_col}{Column name for upper CI of OR (Optional)}
+
+\item{method_col}{Column name which contains the MR method (Optional)}
+
+\item{force_static}{True for forcing the plot to be returned as a static plot (Optional)}
+}
+\value{
+Plot
 }
 \description{
-Plots Volcano plot
-UNIMPLEMENTED
+Creates a volcano plot of Wald ratios from [do_mr()].
+This function will take all of the Wald ratios in the given data.frame and plot these.
+If the plot is too crowded, subsetting the results before passing them to this plotter will help.
+If `plotly` is installed, the plot will be returned interactive.
 }

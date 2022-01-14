@@ -2,12 +2,61 @@
 % Please edit documentation in R/plots.r
 \name{forest_plot}
 \alias{forest_plot}
-\title{Forest plot of MR results
-UNIMPLEMENTED}
+\title{Forest plot}
 \usage{
-forest_plot(res, dat, report)
+forest_plot(
+  res,
+  snp_col = "snp",
+  beta_col = "b",
+  se_col = "se",
+  pval_col = NULL,
+  or_col = "or",
+  or_lci_col = "or_lci95",
+  or_uci_col = "or_uci95",
+  method_col = "method",
+  exposure_col = "exposure",
+  outcome_col = "outcome",
+  plot_all_res = TRUE
+)
+}
+\arguments{
+\item{res}{A data.frame of MR results}
+
+\item{snp_col}{Column name for SNPs (Optional)}
+
+\item{beta_col}{Column name for beta (Optional)}
+
+\item{se_col}{Column name for standard error (Optional)}
+
+\item{pval_col}{Column name for P value (Optional, unused for now)}
+
+\item{or_col}{Column name for odds ratio (Optional)}
+
+\item{or_lci_col}{Column name for lower CI of OR (Optional)}
+
+\item{or_uci_col}{Column name for upper CI of OR (Optional)}
+
+\item{method_col}{Column name which contains the MR method (Optional)}
+
+\item{exposure_col}{Column name for exposure names (Optional)}
+
+\item{outcome_col}{Column name for outcome names (Optional)}
+
+\item{plot_all_res}{For multi-SNP instruments, also plot the Wald ratios for
+all SNPs (\code{TRUE}) or just the inverse variance weighted
+result (\code{FALSE}).}
+}
+\value{
+Plot
 }
 \description{
-Forest plot of MR results
-UNIMPLEMENTED
+Creates a forest plot of MR estimates from do_mr().
+Will plot both the Wald ratios for all SNPs which form the instrument and
+inverse variance weighted method. However, if you wish for only the "discovery"
+results to be plotted (i.e. WR for single-SNP instruments and only IVW for
+multi-SNP instruments), then setting `plot_all_res` to \code{FALSE} will achieve this.
+If the plot is too crowded, subsetting the results before passing them to this plotter will help.
+}
+\seealso{
+[do_mr()]
 }

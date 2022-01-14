@@ -1,10 +1,18 @@
-#' Calculates F-statistic and related
+#' Calculate F-statistic
 #'
-#' @param dat A data.frame
-#' @param f_cutoff Define an F-statistic cutoff
-#' @param verbose Print messages or not
+#' Calculates portion of variance explained and F-statistic.
+#' If the data is lacking key information, i.e. allele frequencies, sample size
+#' or consists of only one SNP, then the approximate F-statistic will be used
+#' instead: \eqn{F = b ** 2 / SE ** 2}.
 #'
-#' @return Modified `dat` data.frame
+#' @seealso [do_mr()]
+#'
+#' @param dat Data.frame from do_mr()
+#' @param f_cutoff F-statistic cutoff (Optional)
+#' @param verbose Display verbose information (Optional, boolean)
+#'
+#' @return Modified `dat` data.frame (if f_cutoff > 0 supplied)
+#' @export
 calc_f_stat <- function(dat, f_cutoff = 10, verbose = TRUE)
 {
   full.f.stat <- T
@@ -45,8 +53,10 @@ calc_f_stat <- function(dat, f_cutoff = 10, verbose = TRUE)
   return(dat)
 }
 
-#' Calculates proportion of variance explained
-#' From https://doi.org/10.1371/journal.pone.0120758 S1 Text
+#' Calculate PVE
+#'
+#' Calculates proportion of variance explained.
+#' From \href{https://doi.org/10.1371/journal.pone.0120758}{S1 Text}
 #'
 #' @param b Vector or number, beta
 #' @param maf Vector or number, minor allele frequency
@@ -54,6 +64,7 @@ calc_f_stat <- function(dat, f_cutoff = 10, verbose = TRUE)
 #' @param n Vector or number, sample size
 #'
 #' @return Vector or number, proportion of variance explained
+#' @keywords Internal
 .calc_pve <- function(b, maf, se, n)
 {
   tryCatch(
@@ -68,13 +79,16 @@ calc_f_stat <- function(dat, f_cutoff = 10, verbose = TRUE)
   return(pve)
 }
 
+#' WR Taylor Approx of SE
+#'
 #' Calculates the second term Taylor approximation for standard error of
 #' the Wald ratio method.
-#' From https://doi.org/10.1101/2021.03.01.433439 supplementary
+#' From \href{https://doi.org/10.1101/2021.03.01.433439}{supplementary}
 #'
 #' @param object Harmonised data.frame
 #'
 #' @return Results data.frame
+#' @keywords Internal
 .wr_taylor_approx <- function(dat)
 {
   b <- dat$beta.outcome / dat$beta.exposure
@@ -98,12 +112,14 @@ calc_f_stat <- function(dat, f_cutoff = 10, verbose = TRUE)
   return(res)
 }
 
-#' Calculates the inverse variance weighted delta method from the
-#' MendelianRandomization package
+#' IVW weighted delta
+#'
+#' Calculates the inverse variance weighted delta method from the MendelianRandomization package
 #'
 #' @param object Harmonised data.frame
 #'
 #' @return Results data.frame
+#' @keywords Internal
 .ivw_delta <- function(dat)
 {
   nsnps <- nrow(dat)
@@ -148,16 +164,24 @@ calc_f_stat <- function(dat, f_cutoff = 10, verbose = TRUE)
   return(res)
 }
 
-#' Runs Mendelian randomisation and related analyses, including heterogeneity,
-#' Steiger filtering and pleiotropy analyses.
-#' Also generates a number of plots, e.g. volcano plots, for MR results.
+#' Run Mendelian randomisation analyses
+#'
+#' Runs Mendelian randomisation and related analyses:
+#' \enumerate{
+#' \item Wald ratio, see \link[mrpipeline]{.wr_taylor_approx()}
+#' \item Inverse variance weighted, see \link[mrpipeline]{.ivw.delta()}
+#' \item Steiger filtering, see TwoSampleMR::directionality_test()
+#' }
+#'
+#' @seealso [.wr_taylor_approx()], [.ivw_delta()], [TwoSampleMR::directionality_test()]
 #'
 #' @param dat A data.frame of harmonised data
-#' @param f_cutoff Define an F-statistic cutoff
-#' @param all_wr Should the Wald ratio be calculated for all SNPs, even if IVW can be used?
-#' @param verbose Print messages or not
+#' @param f_cutoff Define an F-statistic cutoff (Optional)
+#' @param all_wr Should the Wald ratio be calculated for all SNPs, even if IVW can be used? (Optional)
+#' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return A data.frame of MR results
+#' @export
 do_mr <- function(dat, f_cutoff = 10, all_wr = TRUE, verbose = TRUE)
 {
   if (!is.null(f_cutoff)) {
@@ -231,19 +255,31 @@ do_mr <- function(dat, f_cutoff = 10, all_wr = TRUE, verbose = TRUE)
   return(res)
 }
 
-#' Runs colocalisation using the coloc R package's coloc.abf function
+#' Run colocalisation analyses
+#'
+#' Runs colocalisation using any of the following methods:
+#' \enumerate{
+#' \item Coloc.abf, see coloc::coloc.abf()
+#' \item Coloc.susie, see coloc::coloc.susie()
+#' \item PWCoCo, see \href{https://github.com/jwr-git/pwcoco}{PWCoCo}
+#' }
+#' NB: PWCoCo is not available on Windows.
+#'
+#' @seealso [coloc::coloc.abf()], [coloc::coloc.susie()]
 #'
 #' @param dat A data.frame of harmonised data
-#' @param method Which method of colocalisation to use: coloc.abf, coloc.susie, pwcoco
-#' @param coloc_window Size (+/-) of region to extract for colocalisation analyses
-#' @param bfile Path to Plink bed/bim/fam files
-#' @param plink Path to Plink binary
-#' @param pwcoco If PWCoCo is the selected coloc method, path to PWCoCo executible
-#' @param workdir Path to save temporary files
-#' @param cores Amount of cores to use for multi-threaded data extraction
-#' @param verbose Print messages or not
+#' @param method Which method of colocalisation to use: coloc.abf, coloc.susie, pwcoco (Optional)
+#' @param coloc_window Size (+/-) of region to extract for colocalisation analyses (Optional)
+#' @param bfile Path to Plink bed/bim/fam files (Optional)
+#' @param plink Path to Plink binary (Optional)
+#' @param pwcoco If PWCoCo is the selected coloc method, path to PWCoCo binary (Optional)
+#' @param workdir Path to save temporary files (Optional)
+#' @param cores Number of cores for multi-threaded tasks (Optional)
+#'              NB: Unavailable on Windows machines
+#' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return A data.frame of colocalistion results
+#' @export
 do_coloc <- function(dat,
                      method = "coloc.abf",
                      coloc_window = 500000,
@@ -391,13 +427,14 @@ do_coloc <- function(dat,
 #'
 #' @param dat1 SNPs, etc. from first dataset
 #' @param dat2 SNPs, etc. from second dataset
-#' @param min_snps Number of minimum SNPs to check for analysis to continue
-#' @param p1 p1 for coloc
-#' @param p2 p2 for coloc
-#' @param p12 p12 for coloc
-#' @param verbose Print messages or not
+#' @param min_snps Number of minimum SNPs to check for analysis to continue (Optional)
+#' @param p1 p1 for coloc (Optional)
+#' @param p2 p2 for coloc (Optional)
+#' @param p12 p12 for coloc (Optional)
+#' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return Results data.frame
+#' @keywords Internal
 .coloc_sub <- function(dat1, dat2,
                        min_snps = 100,
                        p1 = 1e-4,
@@ -445,16 +482,19 @@ do_coloc <- function(dat,
   return(cres$summary)
 }
 
+#' Prepare gwasvcf files for PWCoCo
+#'
 #' Write files for PWCoCo where data are read from two VCF objects or files.
 #'
 #' @param vcf1 VCF object or path to VCF file
 #' @param vcf2 VCF object or path to VCF file
 #' @param chrompos Character of the format chr:pos1-pos2
-#' @param type1 How to treat vcffile1 for coloc, either "quant" or "cc"
-#' @param type2 How to treat vcffile2 for coloc, either "quant" or "cc"
+#' @param type1 How to treat vcffile1 for coloc, either "quant" or "cc" (Optional)
+#' @param type2 How to treat vcffile2 for coloc, either "quant" or "cc" (Optional)
 #' @param outfile Path to output files, without file ending
 #'
-#' return 0 if success, 1 if there was a problem
+#' @return 0 if success, 1 if there was a problem
+#' @keywords Internal
 .gwasvcf_to_pwcoco <- function(vcf1, vcf2, chrompos, type1=NULL, type2=NULL, outfile)
 {
   overlap <- gwasvcf::vcflist_overlaps(list(vcf1, vcf2), chrompos)
@@ -516,16 +556,19 @@ do_coloc <- function(dat,
   return(0)
 }
 
+#' Prepare ieugwasr data for PWCoCo
+#'
 #' Write files for PWCoCo where data are read from the OpenGWAS DB.
 #'
 #' @param id1 ID for trait 1
 #' @param id2 ID for trait 2
 #' @param chrompos Character of the format chr:pos1-pos2
-#' @param type1 How to treat vcffile1 for coloc, either "quant" or "cc"
-#' @param type2 How to treat vcffile2 for coloc, either "quant" or "cc"
+#' @param type1 How to treat vcffile1 for coloc, either "quant" or "cc" (Optional)
+#' @param type2 How to treat vcffile2 for coloc, either "quant" or "cc" (Optional)
 #' @param outfile Path to output files, without file ending
 #'
-#' return 0 if success, 1 if there was a problem
+#' @return 0 if success, 1 if there was a problem
+#' @keywords Internal
 .ieugwasr_to_pwcoco <- function(id1, id2, chrompos, type1=NULL, type2=NULL, outfile)
 {
   tib1 <- ieugwasr::associations(id=id1, variants=chrompos) %>% subset(., !duplicated(rsid))
@@ -584,14 +627,15 @@ do_coloc <- function(dat,
 #' @param bfile Path to Plink bed/bim/fam files
 #' @param chrpos Character of the format chr:pos1-pos2
 #' @param pwcoco Path to PWCoCo executible
-#' @param maf MAF cut-off
-#' @param p1 p1 for coloc
-#' @param p2 p2 for coloc
-#' @param p12 p12 for coloc
-#' @param workdir Path to save temporary files
-#' @param verbose Print messages or not
+#' @param maf MAF cut-off (Optional)
+#' @param p1 p1 for coloc (Optional)
+#' @param p2 p2 for coloc (Optional)
+#' @param p12 p12 for coloc (Optional)
+#' @param workdir Path to save temporary files (Optional)
+#' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return Results data.frame
+#' @keywords Internal
 .pwcoco_sub <- function(bfile,
                         chrpos,
                         pwcoco,
