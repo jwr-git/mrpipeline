@@ -33,12 +33,12 @@ Imports:
   parallel,
   VariantAnnotation
 Remotes:
-  github::MRCIEU/TwoSampleMR
-  github::MRCIEU/ieugwasr
-  github::MRCIEU/gwasglue
-  github::MRCIEU/gwasvcf
-  github::MRCIEU/epigraphdb
-  github::jrs95/gassocplot
+  github::MRCIEU/TwoSampleMR,
+  github::MRCIEU/ieugwasr,
+  github::MRCIEU/gwasglue,
+  github::MRCIEU/gwasvcf,
+  github::MRCIEU/epigraphdb,
+  github::jrs95/gassocplot,
   bioc::3.12/VariantAnnotation
 RoxygenNote: 7.1.2
 Suggests:
