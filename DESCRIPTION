@@ -13,7 +13,7 @@ License: What license is it under?
 Encoding: UTF-8
 LazyData: true
 Depends:
-  R (>= 4.0.0)
+  R (>= 3.6.0)
 Imports: 
   TwoSampleMR, 
   ieugwasr, 
@@ -37,7 +37,6 @@ Remotes:
   github::MRCIEU/ieugwasr,
   github::MRCIEU/gwasglue,
   github::MRCIEU/gwasvcf,
-  github::MRCIEU/epigraphdb,
   github::jrs95/gassocplot,
   bioc::3.12/VariantAnnotation
 RoxygenNote: 7.1.2
