@@ -1,3 +1,7 @@
+#' @importFrom magrittr %>%
+#' @export
+magrittr::`%>%`
+
 #' Convert file(s) to gwasvcf format.
 #'
 #' Function to convert a file (or files) to gwasvcf format.
@@ -24,6 +28,7 @@
 #' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return gwasvcf object(s)
+#' @importFrom parallel mclapply
 #' @export
 file_to_gwasvcf <- function(file,
                             chr_col,
@@ -50,14 +55,14 @@ file_to_gwasvcf <- function(file,
 
     if (!file.exists(f)) {
       .print_msg(paste0("Could not find file \"", f, "\". Skipping."), verbose)
-      next
+      return(NA)
     }
 
     dat <- read.table(f, header = header, sep = sep, stringsAsFactors = F)
 
     if (nrow(dat) < 1) {
       .print_msg(paste0("Failed to load data from file \"", f, "\". Skipping."), verbose)
-      next
+      return(NA)
     }
 
     out <- paste0(file_path_sans_ext(file), ".vcf")
@@ -95,6 +100,8 @@ file_to_gwasvcf <- function(file,
 #' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return gwasvcf object
+#' @importFrom gwasvcf create_vcf
+#' @importFrom VariantAnnotation writeVcf
 #' @export
 dat_to_gwasvcf <- function(dat,
                            out,
@@ -288,6 +295,11 @@ read_outcome <- function(ids,
 #' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return Data.frame of datasets
+#' @importFrom parallel mclapply
+#' @importFrom gwasvcf query_gwas
+#' @importFrom gwasglue gwasvcf_to_TwoSampleMR
+#' @importFrom dplyr mutate
+#' @importFrom ieugwasr tophits associations gwasinfo ld_clump
 .read_dataset <- function(ids,
                           rsids = NULL,
                           pval = 5e-8,
@@ -444,6 +456,7 @@ read_outcome <- function(ids,
 #' @param build Genomic build (Optional)
 #'
 #' @return Data.frame with appended column for names
+#' @importFrom biomaRt useMart getBM
 #' @keywords Internal
 .ensg_to_name <- function(dat,
                           ensg_col = "trait",
@@ -466,9 +479,9 @@ read_outcome <- function(ids,
   }
 
   attempt <- tryCatch({
-    mart.gene <- biomaRt::useMart(biomart = biomart,
-                                  host = host,
-                                  dataset = dataset)
+    mart.gene <- useMart(biomart = biomart,
+                         host = host,
+                         dataset = dataset)
   }, error = function(e) {
     warning("biomaRt is currently unavailable and so ENSG IDs will not be annotated.")
   })
@@ -477,10 +490,10 @@ read_outcome <- function(ids,
     return(dat)
   }
 
-  results <- biomaRt::getBM(attributes = c("ensembl_gene_id", "hgnc_symbol", "chromosome_name", "start_position", "end_position"),
-                            filters = "ensembl_gene_id",
-                            values = unique(dat[[ensg_col]]),
-                            mart = mart.gene)
+  results <- getBM(attributes = c("ensembl_gene_id", "hgnc_symbol", "chromosome_name", "start_position", "end_position"),
+                   filters = "ensembl_gene_id",
+                   values = unique(dat[[ensg_col]]),
+                   mart = mart.gene)
 
   if (length(results) && nrow(results)) {
     results <- subset(results, select = c(ensembl_gene_id, hgnc_symbol))
@@ -536,6 +549,7 @@ annotate_ensg <- function(dat,
 #' @param column Column name containing disease names
 #'
 #' @return Data.frame with appended column for EFO IDs
+#' @importFrom epigraphdb ontology_gwas_efo
 #' @export
 annotate_efo <- function(dat,
                          column = "outcome")
@@ -544,7 +558,7 @@ annotate_efo <- function(dat,
 
   lapply(1:nrow(dat), function(i) {
     disease <- iconv(dat[i, column], from = 'UTF-8', to = 'ASCII//TRANSLIT')
-    attempt <- try(r <- epigraphdb::ontology_gwas_efo(disease, fuzzy = T, mode = "table"), silent = T)
+    attempt <- try(r <- ontology_gwas_efo(disease, fuzzy = T, mode = "table"), silent = T)
 
     if (!inherits(attempt, "try-error") && length(r)) {
       efo <- r[r$r.score > 0.95,][1, ]$efo.id
@@ -580,6 +594,7 @@ annotate_efo <- function(dat,
 #' @param build Genomic build (Optional)
 #'
 #' @return Data.frame with appended column for cis/trans status
+#' @importFrom biomaRt useMart getBM useEnsembl
 #' @export
 cis_trans <- function(dat,
                       cis_region = 500000,
@@ -626,9 +641,9 @@ cis_trans <- function(dat,
   }
 
   attempt <- tryCatch({
-    mart.gene <- biomaRt::useMart(biomart = biomart,
-                                  host = host,
-                                  dataset = dataset)
+    mart.gene <- useMart(biomart = biomart,
+                         host = host,
+                         dataset = dataset)
   }, error = function(e) {
     warning("biomaRt is currently unavailable and so cis/trans status will not be annotated.")
   })
@@ -637,10 +652,10 @@ cis_trans <- function(dat,
     return(dat)
   }
 
-  results <- biomaRt::getBM(attributes = c("ensembl_gene_id", "hgnc_symbol", "chromosome_name", "start_position", "end_position"),
-                            filters = filter,
-                            values = unique(dat[[values_col]]),
-                            mart = mart.gene)
+  results <- getBM(attributes = c("ensembl_gene_id", "hgnc_symbol", "chromosome_name", "start_position", "end_position"),
+                   filters = filter,
+                   values = unique(dat[[values_col]]),
+                   mart = mart.gene)
 
   if (length(results) && nrow(results)) {
     dat <- base::merge(dat, results, by.x = values_col, by.y = filter, all.x = TRUE, suffixes = c("", ".y"))
@@ -656,10 +671,10 @@ cis_trans <- function(dat,
           )
       )
     } else {
-      snp_res <- biomaRt::getBM(attributes = c("refsnp_id", "chr_name", "chrom_start", "chrom_end"),
-                                filters = "snp_filter",
-                                values = unique(dat[[snp_col]]),
-                                mart = useEnsembl("snp", dataset = "hsapiens_snp", GRCh = grch))
+      snp_res <- getBM(attributes = c("refsnp_id", "chr_name", "chrom_start", "chrom_end"),
+                       filters = "snp_filter",
+                       values = unique(dat[[snp_col]]),
+                       mart = useEnsembl("snp", dataset = "hsapiens_snp", GRCh = grch))
 
       if (length(snp_res) && nrow(snp_res)) {
         dat <- base::merge(dat, snp_res, by.x = snp_col, by.y = refsnp_id, all.x = TRUE, suffixes = c("", ".z"))
@@ -697,10 +712,11 @@ cis_trans <- function(dat,
 #' @param action How to harmonise alleles; see \link[TwoSampleMR]{harmonise_data}.
 #'
 #' @return Harmonised data.frame
+#' @importFrom TwoSampleMR harmonise_data
 #' @export
 harmonise <- function(exposure,
                       outcome,
                       action = 2)
 {
-  dat <- TwoSampleMR::harmonise_data(exposure, outcome, action = action)
+  dat <- harmonise_data(exposure, outcome, action = action)
 }

@@ -38,21 +38,21 @@ z_plot <- function(dat,
     return(NA)
   }
 
-  p <- ggplot2::ggplot(data = dat, aes(x = get(beta_col) / get(se_col),
-                                       y = -log10(get(pval_col)))) +
-    ggplot2::geom_point(size = 2, alpha = 0.8, aes(text = sprintf("SNP: %s", get(snp_col)))) +
-    ggplot2::theme_bw() +
+  p <- ggplot(data = dat, aes(x = get(beta_col) / get(se_col),
+                              y = -log10(get(pval_col)))) +
+    geom_point(size = 2, alpha = 0.8, aes(text = sprintf("SNP: %s", get(snp_col)))) +
+    theme_bw() +
     #theme(axis.title.x = element_blank(), axis.title.y = element_blank(),
     #      legend.position = c(0.9, 0.9), legend.background = element_rect(size=0.5, linetype="solid",
     #                                                                      colour ="darkgrey"),
     #      panel.grid.major = element_blank(), panel.grid.minor = element_blank(),
     #      legend.text=element_text(size=20), legend.title = element_text(size=20)) +
-    ggplot2::geom_vline(xintercept = 0.0, col = "black", linetype = "dotted") +
-    ggplot2::geom_hline(yintercept = -log10(5e-8), col = "darkgrey", linetype = "twodash", size = 1) +
-    ggplot2::xlab("Beta / SE") +
-    ggplot2::ylab("-log10(P value)") +
-    ggplot2::ggtitle(paste0("Plot of Z scores against P value")) +
-    ggplot2::stat_smooth(method = "lm", formula = y ~ poly(x, 2), alpha = 0.5, colour = "grey")
+    geom_vline(xintercept = 0.0, col = "black", linetype = "dotted") +
+    geom_hline(yintercept = -log10(5e-8), col = "darkgrey", linetype = "twodash", size = 1) +
+    xlab("Beta / SE") +
+    ylab("-log10(P value)") +
+    ggtitle(paste0("Plot of Z scores against P value")) +
+    stat_smooth(method = "lm", formula = y ~ poly(x, 2), alpha = 0.5, colour = "grey")
 
   if (require("plotly") && !force_static) {
     p <- plotly::ggplotly(p)
@@ -162,6 +162,7 @@ volcano_plot <- function(res,
 #'                     result (\code{FALSE}).
 #'
 #' @return Plot
+#' @importFrom ggplot2 ggplot aes geom_point geom_errorbarh geom_vline facet_grid xlab ylab theme_bw
 #' @export
 forest_plot <- function(res,
                         snp_col = "snp",
@@ -212,10 +213,10 @@ forest_plot <- function(res,
 
   p <- to_plot %>%
     dplyr::arrange((!!exposure_col), (!!outcome_col), desc(label)) %>%
-    ggplot2::ggplot(data = .,
-                       aes(x = get(or_col),
-                           y = label,
-                           group = interaction(get(exposure_col), get(outcome_col)))) +
+    ggplot(data = .,
+           aes(x = get(or_col),
+               y = label,
+               group = interaction(get(exposure_col), get(outcome_col)))) +
     geom_point(aes(shape = as.factor(shape))) +
     geom_errorbarh(aes(xmin = get(or_lci_col), xmax = get(or_uci_col))) +
     geom_vline(xintercept = 1, lty = 2) +
