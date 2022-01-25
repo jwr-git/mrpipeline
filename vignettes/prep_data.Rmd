@@ -1,0 +1,168 @@
+---
+title: "Preparing your Data"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{"Preparing your Data"}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+library(mrpipeline)
+```
+
+
+# Introduction
+
+The pipeline makes specific use of the "gwasvcf" format created by Bristol (see: https://github.com/MRCIEU/gwasvcf). The gwasvcf format is generally simple to use, fairly lightweight for storage of GWAS data and, most importantly, has a standard format meeting the pipeline can expect a specific format for each function. This makes it much easier to know what format of data the user will input into the pipeline and make automating many of the functions simple.
+
+## Local gwasvcf Files
+
+As mentioned above, the pipeline mainly accepts data in the gwasvcf format. The pipeline is bundled with some wrapped functions which can help with re-formatting your data into this format (see: XXX).
+
+## OpenGWAS
+
+In place of file names, the pipeline will also accept [OpenGWAS](https://gwas.mrcieu.ac.uk/) IDs, e.g. [ieu-a-7](https://gwas.mrcieu.ac.uk/datasets/ieu-a-7/). OpenGWAS fundamentally stores its data in the gwasvcf format and so expanding functions to accept these IDs meant that a large resource of GWAS data could be integrated into the pipeline for the user's ease of use without having to continually download and convert large files.
+
+For more information, see the [ieugwasr](https://github.com/MRCIEU/ieugwasr) R package.
+
+# Data Types
+
+The pipeline follows the structure of a standard Mendelian randomisation (MR) analysis. Data are categorised as either exposure or outcome, with the pipeline expecting certain columns for both.
+
+## Exposure data
+
+### Structure
+
+Generally, the exposure data will contain the following information:
+
+* `exposure` - Name or identifier for exposure. Many exposures can be combined into the one dataframe
+* `SNP` - rsIDs for SNPs
+* `beta` - The effect size
+* `se` - The standard error of the effect size
+* `effect_allele` - The allele for which the effect size has been measured
+
+Other columns which may be present, and required for certain functions, are:
+
+* `chr` - Chromosome of the SNP
+* `position` - Position on the chromosome of the SNP
+* `pval` - P value for the SNP's association with the exposure
+* `samplesize` - Sample size in which the effect was estimated
+* `id` - Helper column with unique ID for the exposure
+* `file` - Helper column with either OpenGWAS ID or filename for the exposure
+* `other_allele` - The non-effect allele
+* `eaf` - Frequency of the effect allele
+* `mr_keep` - Should these SNPs be used in MR?
+
+```{r exposure}
+exp_dat <- read_exposure("eqtl-a-ENSG00000167207")
+
+head(data.frame(exp_dat))
+```
+
+**N.B.** Many column names are shared between exposure and outcome data, and so these are prefixed with either `.exposure` or `.outcome`.
+
+The exposure data *can* be constructed manually from, for example, a data file or another data.frame, so long as you convert the data into a format the pipeline will expect. This includes re-naming columns and ensuring the column types are as expected.
+
+### Details
+
+The `read_exposure` function abstracts away a lot of steps that can alter the results and interpretations of an MR study. To this end, we decided upon a set of standard parameters that the pipeline will use to ensure that results for many users will be directly comparable. However, these can be changed by the more advanced user.
+
+The steps taken by the `read_exposure` function are as follows:
+
+1. SNPs are selected based on a P value threshold (default: 5e-8).
+1. Clumping to ensure only independent SNPs are carried forward.
+    * Clumping can be conducted either locally or on the OpenGWAS server.
+    * If an OpenGWAS ID is used for your exposure data, these are generally pre-clumped on the server and will be reduced quicker than if the clumping needs to take place due to, for example, non-default parameters.
+    * Local clumping requires giving the `read_exposure` function a pathway to Plink and Plink reference files.
+    * Default parameters for clumping:
+    ** clump_r2 = 0.01
+    ** clump_kb = 10000
+    ** pop = "EUR"
+
+```{r exp-help, eval = FALSE}
+?read_exposure
+```
+
+Will show the full list of arguments for this function, what they mean and their default values.
+
+## Outcome data
+
+### Structure
+
+Generally, the outcome data will contain the following information:
+
+* `outcome` - Name or identifier for outcome. Many outcome can be combined into the one dataframe
+* `SNP` - rsIDs for SNPs
+* `beta` - The effect size
+* `se` - The standard error of the effect size
+* `effect_allele` - The allele for which the effect size has been measured
+
+Other columns which may be present, and required for certain functions, are:
+
+* `chr` - Chromosome of the SNP
+* `position` - Position on the chromosome of the SNP
+* `pval` - P value for the SNP's association with the outcome
+* `samplesize` - Sample size in which the effect was estimated
+* `id` - Helper column with unique ID for the outcome
+* `file` - Helper column with either OpenGWAS ID or filename for the outcome
+* `other_allele` - The non-effect allele
+* `eaf` - Frequency of the effect allele
+
+Columns present when searching for proxy SNPs:
+
+* `target_snp` - The original SNP provided
+* `proxy_snp` - The SNP which will be used in the analyses (may be the same as `target_snp`, in which case no proxy was used)
+* `proxy` - Whether the SNP is a proxy or not
+* `target_a1` - Original effect allele
+* `target_a2` - Original non-effect allele
+* `proxy_a1` - Proxy effect allele
+* `proxy_a2` - Proxy non-effect allele
+
+```{r outcome}
+out_dat <- read_outcome("ieu-a-7", rsids = exp_dat$SNP)
+
+head(data.frame(out_dat))
+```
+
+The outcome data will require the exposure SNPs as an argument. This is to prevent the pipeline from having to load the entire outcome data into memory. The `read_outcome` function will take these SNPs and perform a look up in the outcome datasets for only those SNPs.
+
+### Details
+
+Similar to the `read_exposure` function, the `read_outcome` function also incorporates searching for proxy SNPs into one function call. By default, the pipeline will attempt to look for proxies for SNPs which are not present in the outcome dataset (default: rsq = 0.8). Similar to clumping, the user can decide whether the proxy search is carried out on the OpenGWAS servers (default) or locally, in which case a pathway to Plink and a reference panel are required.
+
+```{r out-help, eval = FALSE}
+?read_outcome
+```
+
+For more details.
+
+## Harmonised data
+
+### Structure
+
+Before use in MR, the exposure and outcome datasets must be harmonised so that the alignment of the beta estimate and effect allele are the same for the exposure and outcome. This can be achieved by:
+
+```{r harmonise}
+dat <- harmonise(exp_dat, out_dat)
+
+head(data.frame(dat))
+```
+
+### Details
+
+For all intents and purposes, this function is a wrapper for the `TwoSampleMR::harmonise_data` function (using action = 2 as default). That package has a [good vignette](https://mrcieu.github.io/TwoSampleMR/articles/harmonise.html) describing how the process works, which we recommend reading.
+

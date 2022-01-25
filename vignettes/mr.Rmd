@@ -1,0 +1,76 @@
+---
+title: "Mendelian randomisation analyses"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{"Mendelian randomisation analyses"}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+library(mrpipeline)
+```
+
+# Introduction
+
+The pipeline contains the ability to run Mendelian randomisation analyses, including relevant sensitivity analyses and visualisation of results from these analyses.
+
+# Performing MR
+
+The pipeline expects a harmonised dataset to conduct MR.
+
+```{r data}
+exp_dat <- read_exposure("eqtl-a-ENSG00000167207")
+out_dat <- read_outcome("ieu-a-7", rsids = exp_dat$SNP)
+dat <- harmonise(exp_dat, out_dat)
+
+res <- do_mr(dat)
+
+head(data.frame(res))
+```
+
+The `do_mr` function conducts the following analyses in this order:
+
+1. If the F-statistic has not been calculated for the exposure data, and an F cutoff threshold is given (default: 10) then the F-statistic will be calculated here.
+    * There are two methods which are used to calculate the F-statistic, depending on the data available.
+    * If allele frequencies and sample sizes are available, the full F-statistic will be calculated.
+        * This function will estimate the portion of variance explained (PVE) and calculate the F-statistic using the formulae presented in [this paper](https://doi.org/10.1093/ije/dyr036).
+    * If these data are not available, the approximate F-statistic will be used instead.
+        * This is calculated as $F = b^2 / SE^2$.
+    * **N.B.** the F-statistic can be run after loading the exposure data and does not have to be calculated here:
+    ```{r f-stat}
+    exp_dat <- calc_f_stat(exp_dat)
+    
+    head(data.frame(exp_dat))
+    ```
+
+1. The Wald ratio (WR) method is used for single-SNP instruments.
+    * If the `all_wr` argument is `TRUE`, as it is by default, then the WR will be calculated for all SNPs, even if there are multiple SNPs present for a single exposure. 
+    * The WR method herein uses the second-term Taylor series expansion for the approximation of the standard error (more information on this, including the derivation, can be found in [this paper](https://doi.org/10.1101/2021.03.01.433439), supplementary).
+    
+1. The inverse variance weighted (IVW) method is used for multi-SNP instruments.
+    * This method uses the delta method as detailed in the `MendelianRandomization` package (see: https://rdrr.io/cran/MendelianRandomization/man/mr_ivw.html). 
+    
+1. Finally, if sample sizes are present for both exposure and outcome datasets, then a test for directionality (Steiger filtering) will be conducted. The pipeline directly calls the TwoSampleMR package for this analysis, so we advise reading those [vignettes](https://mrcieu.github.io/TwoSampleMR/articles/perform_mr.html#mr-steiger-directionality-test-1).
+
+# Visualising MR results
+
+Under construction.
+
+Forest plot:
+```{r forest, fig.width=7, fig.height=4, echo=FALSE}
+forest_plot(res)
+```

@@ -31,7 +31,8 @@ Imports:
   ggplot2, 
   gassocplot,
   parallel,
-  VariantAnnotation
+  VariantAnnotation,
+  magrittr
 Remotes:
   github::MRCIEU/TwoSampleMR,
   github::MRCIEU/ieugwasr,
@@ -41,5 +42,8 @@ Remotes:
   bioc::3.12/VariantAnnotation
 RoxygenNote: 7.1.2
 Suggests:
-  plotly,
-  biomaRt
+    plotly,
+    biomaRt,
+    knitr,
+    rmarkdown
+VignetteBuilder: knitr
