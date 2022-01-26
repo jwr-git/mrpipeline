@@ -1,0 +1,87 @@
+---
+title: "Annotating your Data and Results"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{"Annotating your Data and Results"}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+library(mrpipeline)
+```
+
+
+# Introduction
+
+The pipeline includes a number of functions which can be used to annotate data and results. This vignette will explain this functions, how they are used, and how they may improve analyses and understanding of results.
+
+# Cis/trans variants
+
+It is possible to annotate SNPs as cis or trans using the biomaRt package. Annotating the exposure SNPs in this way allows you to subset SNPs based on this status (e.g. to run a cis-only analysis).
+
+```{r cistrans}
+exposure <- read_exposure(c("eqtl-a-ENSG00000130669", "eqtl-a-ENSG00000001167", "eqtl-a-ENSG00000169704"))
+exposure <- cis_trans(exposure)
+
+head(data.frame(exposure))
+```
+
+This function can use either Ensembl Gene IDs (ENSG) or gene names (HGNC symbol) as decided by the `filter` argument (default ENSG IDs). Furthermore, it will require either SNP rsIDs or chromosome and positions for SNPs. See `?cis_trans` for more details about these arguments.
+
+New columns will be added to the data:
+
+* `hgnc_symbol` or `ensembl_gene_id`, annotated genes. The present column will be the opposite of the `filter` argument
+* `chromosome_name` for the gene, as present in biomaRt
+* `start_position` for the gene, as present in biomaRt
+* `end_position` for the gene, as present in biomaRt
+* `cistrans` can take three values: "C" for cis, "T" for trans, "U" for unknown if not found in biomaRt
+
+# Annotate ENSG
+
+Although `cis_trans` can annotate ENSG IDs, a separate function is also available to *only* convert ENSG IDs to gene names.
+
+```{r ensg_hgnc}
+exposure <- read_exposure(c("eqtl-a-ENSG00000130669", "eqtl-a-ENSG00000001167", "eqtl-a-ENSG00000169704"))
+exposure <- annotate_ensg(exposure)
+
+head(data.frame(exposure))
+```
+
+* Annotate EFO
+
+Experimental Factor Ontology terms are used to provide a systematic description for many variables in the EBI database and are commonly used by many resources for systematic API access. This function uses the [EpigraphDB](http://epigraphdb.org/) resource to annotate terms with EFO IDs.
+
+```{r efo}
+outcome <- read_outcome("ieu-b-7", rsids = exposure$SNP)
+outcome <- annotate_efo(outcome)
+
+head(data.frame(outcome))
+```
+
+# Druggability
+
+## Drug-Genome Interaction DB
+
+The [DGIdb](https://dgidb.org/) contains information on drug-gene interactions and druggable genome mined from a variety of sources. The pipeline contains a wrapper function for the DGIdb API to annotate for a list of druggability terms.
+
+```{r dgidb}
+dt_evidence <- drug_target_evidence(exposure)
+
+head(data.frame(dt_evidence))
+```
+
+The function takes a column which contains ENSG IDs (default: "exposure"). 

@@ -329,3 +329,46 @@ forest_plot_single <- function()
   g <- grid::grid.draw(gt)
   return(g)
 }
+
+#' Plots a regional plot of the area being tested for colocalisation
+#'
+#' @param dat A data.frame of harmonised data
+#' @param exposure Character, name of exposure
+#' @param outcome Character, name of outcome
+#' @param bfile Path to Plink bed/bim/fam files
+#' @param plink Path to Plink binary
+#' @param verbose Print messages or not
+#'
+#' @return NULL
+#' @importFrom gwasglue coloc_to_gassocplot
+#' @importFrom gassocplot stack_assoc_plot
+#' @export
+regional_plot <- function(dat, exposure, outcome, bfile = NULL, plink = NULL, verbose = TRUE)
+{
+  p <- NA
+  if (require("gassocplot"))
+  {
+    tryCatch(
+      expr = {
+        dat <- gwasglue::coloc_to_gassocplot(dat, bfile = bfile, plink_bin = plink)
+        p <- gassocplot::stack_assoc_plot(dat$markers, dat$z, dat$corr, traits = dat$traits)
+
+        # Annotate titles
+        # TODO Better way of referencing these than hard-coded numbers?
+        tryCatch({
+          p$grobs[[1]]$grobs[[22]]$label <- exposure # Top
+          p$grobs[[1]]$grobs[[65]]$label <- outcome # Bottom
+        })
+
+        # a <- grid.grabExpr(gassocplot::stack_assoc_plot(dat$markers, dat$z, dat$corr, traits = dat$traits)) %>%
+        # editGrob()
+      },
+      error = function(e) {
+        .print_msg(paste0("Could not generate regional plot for \"", exposure, "\" and \"", outcome, "\".)"), verbose = verbose)
+      }
+    )
+  }
+
+  return(p)
+}
+
