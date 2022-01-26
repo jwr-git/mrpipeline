@@ -1,0 +1,93 @@
+---
+title: "Colocalisation analyses"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{"Colocalisation analyses"}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+<style type="text/css">
+.main-container {
+  max-width: 1800px;
+  margin-left: auto;
+  margin-right: auto;
+}
+</style>
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>"
+)
+
+library(mrpipeline)
+```
+
+
+# Introduction
+
+The pipeline also has the ability to automate colocalisation analyses using a variety of methods. These include:
+
+* Bayesian colocalisation, commonly called "coloc" and implemeneted in the [coloc R package](https://github.com/chr1swallace/coloc) (called using `coloc.abf`)
+* Coloc + SuSiE (also implemented in the [coloc R package](https://github.com/chr1swallace/coloc)), which combines SuSiE, a method of determining conditionally independent signals within the region (called using `coloc.susie` **Unimplemented**)
+* Pair-wise conditional and colocalisation (PWCoCo), a C++ command line tool that uses approximate conditional analyses to determine independent signals within the region (documentation available on [github](https://github.com/jwr-git/pwcoco)) (called using `pwcoco`)
+
+By default, coloc is used by the pipeline due to the extra data required for the other colocalisation methods. Please see the XXX vignette for points of consideration when selecting the correct method for your analysis.
+
+# Performing colocalisation
+
+The colocalisation analyses require a harmonised dataset like the MR analyses. Let us use the same example as before:
+
+```{r data}
+exp_dat <- read_exposure("eqtl-a-ENSG00000167207")
+out_dat <- read_outcome("ieu-a-7", rsids = exp_dat$SNP)
+dat <- harmonise(exp_dat, out_dat)
+
+head(data.frame(dat))
+```
+
+Running colocalisation using the default parameters is easy:
+
+```{r coloc}
+cres <- do_coloc(dat)
+
+head(data.frame(cres$res))
+```
+
+There are a few things to note when reading the output of the `do_coloc` function:
+
+* The coloc analyses tend to be fairly verbose and will give information on your datasets which you can check to ensure your data are as expected (e.g. "minimum p value is: 0.001696")
+* It is rare to have access to sdY for coloc analyses, therefore it is common to estimate this using the betas, SEs, MAFs and sample sizes of your datasets. If you would like to read more about this, please see this [coloc vignette](https://chr1swallace.github.io/coloc/articles/vignette.html#orgb0fa807).
+* `do_coloc` will return a list of two:
+
+    * `$res` contains a data.frame of the results from the colocalisation analyses, including how many SNPs were included in the analysis and each PP.
+    * `$plots` contains a list of plots using the [gassocplot](https://github.com/jrs95/gassocplot) R package to generate regional plots for your datasets. Be aware, however, that if you do not provide the `do_coloc` function with arguments for Plink and reference files, gassocplot will only plot your region if it has < 500 SNPs.
+    
+```{r coloc_plot, fig.width=7, fig.height=4, echo=FALSE, warning=FALSE, results='hide',fig.keep='all'}
+cres <- do_coloc(dat, coloc_window = 5e4)
+
+cres$plot
+```
+
+**N.B.** This example has reduced the coloc_window size to limit the number of SNPs in the region and demonstrate the plotting functionality of the pipeline. We do not advise changing the coloc_window in this way without understanding how it changes the underlying analysis.
+
+# Reading the results
+
+Reading the results can differ slightly for each method.
+
+## Coloc.abf
+
+```{r coloc_eg}
+head(data.frame(cres$res))
+```
+
+The results data.frame will contain a row for each combination of exposure and outcome pairs in your harmonised dataset. The data.frame will also tell you how many SNPs are present in your analysis, which can be important for knowing when your analyses may be underpowered. Finally, the PP for each coloc hypothesis are given.
+
+## Coloc.susie
+
+**Unimplemented**
+
+## PWCoCo
+
+*Under construction*
