@@ -326,7 +326,7 @@ read_outcome <- function(ids,
   }
 
   if (is.null(plink) && any(file.exists(ids)) && any(tools::file_ext(ids) == "vcf")) {
-    .print_msg("Path to Plink not given; no LD-related functions will be run for local files.", verbose)
+    .print_msg("Path to Plink not given; LD-related functions will be run through the OpenGWAS API. It may be preferential to run local clumping instead.", verbose)
   }
 
   if (!is.null(plink) && is.null(bfile)) {
@@ -346,7 +346,7 @@ read_outcome <- function(ids,
     rsids <- unique(rsids)
   }
 
-  local_clump <- !(is.null(plink) && is.null(bfile))
+  local_clump <- proxies <- !(is.null(plink) && is.null(bfile))
 
   dat <- parallel::mclapply(1:length(ids), function(i)
   {
@@ -418,7 +418,7 @@ read_outcome <- function(ids,
     }
 
     # Clumping for exposure data
-    if (local_clump && type == "exposure")
+    if (type == "exposure")
     {
       attempt <- try(dat <- dplyr::mutate(dat,
                                           rsid = SNP,
@@ -716,7 +716,7 @@ cis_trans <- function(dat,
 #' @export
 harmonise <- function(exposure,
                       outcome,
-                      action = 2)
+                      action = 1)
 {
   dat <- harmonise_data(exposure, outcome, action = action)
 }
