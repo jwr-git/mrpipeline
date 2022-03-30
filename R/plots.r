@@ -223,7 +223,8 @@ forest_plot <- function(res,
     facet_grid(as.formula(paste(outcome_col, "+", exposure_col, "~.")), scales = "free", space = "free") +
     xlab("Odds Ratio (95% CI)") +
     ylab(" ") +
-    theme_bw()
+    theme_bw() +
+    theme(strip.text.y = element_text(angle = 0), legend.position="none")
 
   return(p)
 }

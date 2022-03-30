@@ -241,6 +241,7 @@ do_mr <- function(dat, f_cutoff = 10, all_wr = TRUE, verbose = TRUE)
   # Steiger
   if (any(is.na(dat$samplesize.exposure)) || any(is.na(dat$samplesize.outcome))) {
     warning("Samplesizes are required for Steiger filtering.")
+    res$steigerflag <- NA
   } else {
     steigerres <- TwoSampleMR::directionality_test(dat)
     steigerres$steigerflag <- ifelse(steigerres$correct_causal_direction == T & steigerres$steiger_pval < 0.05,
@@ -341,7 +342,7 @@ do_coloc <- function(dat,
     f1 <- pairs[i, "file.exposure"][[1]]
     f2 <- pairs[i, "file.outcome"][[1]]
 
-    if (method == "coloc.abf") {
+    if (method == "coloc.abf" || method == "coloc.susie") {
       if (file.exists(f1) && file.exists(f2))
       {
         cdat <- gwasglue::gwasvcf_to_coloc(f1, f2, chrpos)
@@ -353,7 +354,9 @@ do_coloc <- function(dat,
         ## TODO me :(
       }
 
-      cres <- .coloc_sub(cdat[[1]], cdat[[2]], verbose = verbose)
+      cres <- .coloc_sub(cdat[[1]], cdat[[2]],
+                         susie = ifelse(method == "coloc.abf", FALSE, TRUE),
+                         verbose = verbose)
     } else if (method == "pwcoco") {
       if (file.exists(f1) && file.exists(f2)) {
         .gwasvcf_to_pwcoco(f1, f2, chrpos, outfile = workdir)
@@ -362,12 +365,6 @@ do_coloc <- function(dat,
       }
 
       cres <- .pwcoco_sub(chrpos, bfile, pwcoco, workdir)
-    }
-
-    if (method == "coloc.abf") {
-      cres <- .coloc_sub(cdat[[1]], cdat[[2]], verbose = verbose)
-    } else if (method == "pwcoco") {
-      cres <- .pwcoco_sub(cdat[[1]], cdat[[2]], verbose = verbose)
     }
 
     if (length(cdat[[1]]$snp) > 500 && (is.null(plink) || is.null(bfile))) {
@@ -431,6 +428,9 @@ do_coloc <- function(dat,
 #' @param p1 p1 for coloc (Optional)
 #' @param p2 p2 for coloc (Optional)
 #' @param p12 p12 for coloc (Optional)
+#' @param bfile Path to Plink bed/bim/fam files (Optional; required for SuSiE)
+#' @param plink Path to Plink binary (Optional; required for SuSiE)
+#' @param susie Run SuSiE? (Optional, boolean)
 #' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return Results data.frame
@@ -440,6 +440,9 @@ do_coloc <- function(dat,
                        p1 = 1e-4,
                        p2 = 1e-4,
                        p12 = 1e-5,
+                       susie = FALSE,
+                       bfile = NULL,
+                       plink = NULL,
                        verbose = TRUE)
 {
   if (!length(dat1) || !length(dat2)) {
@@ -469,17 +472,93 @@ do_coloc <- function(dat,
     return(NULL)
   }
 
-  attempt <- try(cres <- coloc::coloc.abf(dat1, dat2,
-                                          p1 = p1,
-                                          p2 = p2,
-                                          p12 = p12),
-                 silent = T)
+  if (susie)
+  {
+    if (is.null(plink) || is.null(bfile))
+    {
+      .print_msg("Coloc with SuSiE requires Plink and a reference panel; running only coloc.", verbose)
+      susie <- FALSE
+    } else
+    {
+      attempt <- try(cres <- .coloc_susie_sub(dat1, dat2,
+                                              p1 = p1,
+                                              p2 = p2,
+                                              p12 = p12),
+                     silent = T)
+
+      # Backwards statement for short circuiting purposes
+      if (!(!inherits(attempt, "try-error") && !is.na(cres))) {
+        susie <- FALSE
+      }
+    }
+  }
+
+  # Not an "else if" so we can revert to just coloc if SuSiE cannot be run
+  if (!susie)
+  {
+    attempt <- try(cres <- coloc::coloc.abf(dat1, dat2,
+                                            p1 = p1,
+                                            p2 = p2,
+                                            p12 = p12),
+                   silent = T)
+  }
 
   if (inherits(attempt, "try-error")) {
     return(NA)
   }
 
   return(cres$summary)
+}
+
+#' Sub function to run SuSiE and coloc
+#'
+#' @param d1 Dataset 1
+#' @param d2 Dataset 2
+#' @param bfile Path to Plink bed/bim/fam files (Optional; required for SuSiE)
+#' @param plink Path to Plink binary (Optional; required for SuSiE)
+#' @param verbose Display verbose information (Optional, boolean)
+#' @param ... Other arguments passed to coloc.susie and coloc.bf
+#'
+#' @return Results data.frame
+#' @keywords Internal
+.coloc_susie_sub <- function(d1, d2,
+                             bfile = NULL,
+                             plink = NULL,
+                             verbose = TRUE,
+                             ...)
+{
+  # Datasets have already been harmonised so contain intersection of SNPs
+  # Therefore, we can attempt to find the LD matrix straight away
+  attempt <- tryCatch(
+    expr = {
+      ld <- ieugwasr::ld_matrix_local(d1$snp, bfile, plink, with_alleles = F)
+    },
+    error = function(e) {
+      .print_msg(e, verbose)
+    }
+  )
+
+  if (inherits(attempt, "error"))
+  {
+    .print_msg("No LD matrix generated for coloc with SuSiE; running only coloc.", verbose)
+    return(NA)
+  }
+
+  d1 <- d1[which(d1$snp %in% colnames(ld)), ]
+  d1 <- d1[match(colnames(ld, d1$snp)), ]
+  row.names(d1) <- 1:nrow(d1)
+  d1 <- c(d1, ld = ld)
+
+  d2 <- d2[which(d2$snp %in% colnames(ld)), ]
+  d2 <- d2[match(colnames(ld, d2$snp)), ]
+  row.names(d2) <- 1:nrow(d2)
+  d2 <- c(d2, ld = ld)
+
+  # Run SuSiE and store result
+  s1 <- coloc::runsusie(d1)
+  s2 <- coloc::runsusie(d2)
+
+  return(coloc::coloc.susie(s1, s2, p1 = p1, p2 = p2, p12 = p12, ...))
 }
 
 #' Prepare gwasvcf files for PWCoCo
