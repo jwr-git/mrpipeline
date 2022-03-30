@@ -4,7 +4,7 @@
 \alias{harmonise}
 \title{Harmonise exposure and outcomes.}
 \usage{
-harmonise(exposure, outcome, action = 2)
+harmonise(exposure, outcome, action = 1)
 }
 \arguments{
 \item{exposure}{Data.frame of exposure dataset(s)}

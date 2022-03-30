@@ -11,6 +11,9 @@
   p1 = 1e-04,
   p2 = 1e-04,
   p12 = 1e-05,
+  susie = FALSE,
+  bfile = NULL,
+  plink = NULL,
   verbose = TRUE
 )
 }
@@ -26,6 +29,12 @@
 \item{p2}{p2 for coloc (Optional)}
 
 \item{p12}{p12 for coloc (Optional)}
+
+\item{susie}{Run SuSiE? (Optional, boolean)}
+
+\item{bfile}{Path to Plink bed/bim/fam files (Optional; required for SuSiE)}
+
+\item{plink}{Path to Plink binary (Optional; required for SuSiE)}
 
 \item{verbose}{Display verbose information (Optional, boolean)}
 }
