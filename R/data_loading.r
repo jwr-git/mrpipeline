@@ -375,13 +375,13 @@ read_outcome <- function(ids,
         return(NULL)
       }
 
-      dat <- dat %>%
-        gwasglue::gwasvcf_to_TwoSampleMR(., type = type)
-
       if (nrow(dat) < 1) {
         warning("No SNPs extracted with the given parameters. Please re-check these and try again.")
         return(NULL)
       }
+
+      dat <- dat %>%
+        gwasglue::gwasvcf_to_TwoSampleMR(., type = type)
 
     } else {
       # Extract data from OpenGWAS DB
@@ -722,4 +722,38 @@ harmonise <- function(exposure,
                       action = 1)
 {
   dat <- harmonise_data(exposure, outcome, action = action)
+}
+
+#' Helper function to extract colocalisation regions for when one dataset comes
+#' from a local file and another from OpenGWAS.
+#'
+#'
+.cdat_from_file_opengwas <- function(f1, f2,
+                                     chrpos,
+                                     verbose = TRUE)
+{
+  if (file.exists(f1)) {
+    vcf <- f1
+    opengwas <- f2
+  } else {
+    vcf <- f2
+    opengwas <- f1
+  }
+
+  # First, get data from vcf file
+  vcf_range <- gwasvcf::query_gwas(VariantAnnotation::readVcf(vcf), chrompos = c(chrpos))
+
+  if (length(vcf_range) < 1) {
+    .print_msg(paste0("No data extracted from vcf file: \"", vcf, "\" for range: \"", chrpos, "\". Cannot run coloc for this dataset."), verbose = verbose)
+    return(NA)
+  }
+
+  tab1 <- vcf_range %>%
+    gwasvcf::vcf_to_tibble()
+
+  # Next, from OpenGWAS
+  opengwas_range <- ieugwasr::associations(id = f2, variants = chrpos) %>%
+    subset(., !duplicated(rsid))
+
+  browser()
 }
