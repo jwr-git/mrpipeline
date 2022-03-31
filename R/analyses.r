@@ -351,7 +351,11 @@ do_coloc <- function(dat,
         cdat <- gwasglue::ieugwasr_to_coloc(f1, f2, chrpos)
       } else {
         # One is file, one is not
-        ## TODO me :(
+        .cdat_from_file_opengwas(f1, f2, chrpos, verbose)
+      }
+
+      if (all(is.na(cdat))) {
+        return(NA)
       }
 
       cres <- .coloc_sub(cdat[[1]], cdat[[2]],
@@ -486,8 +490,7 @@ do_coloc <- function(dat,
                                               p12 = p12),
                      silent = T)
 
-      # Backwards statement for short circuiting purposes
-      if (!(!inherits(attempt, "try-error") && !is.na(cres))) {
+      if (inherits(attempt, "try-error") || is.na(cres)) {
         susie <- FALSE
       }
     }
