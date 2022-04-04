@@ -383,6 +383,8 @@ read_outcome <- function(ids,
       dat <- dat %>%
         gwasglue::gwasvcf_to_TwoSampleMR(., type = type)
 
+      dat[[paste0("id.", type)]] <- id
+
     } else {
       # Extract data from OpenGWAS DB
       if (type == "exposure") {
@@ -726,11 +728,18 @@ harmonise <- function(exposure,
 
 #' Helper function to extract colocalisation regions for when one dataset comes
 #' from a local file and another from OpenGWAS.
+#' @seealso [gwasglue::gwasvcf_to_coloc()], [gwasglue::ieugwasr_to_coloc()]
 #'
+#' @param f1 File path or OpenGWAS ID for trait 1
+#' @param f2 File path or OpenGWAS ID for trait 2
+#' @param chrpos Character of the format chr:pos1-pos2
+#' @param verbose Display verbose information (Optional, boolean)
 #'
-.cdat_from_file_opengwas <- function(f1, f2,
-                                     chrpos,
-                                     verbose = TRUE)
+#' @return list of coloc-ready data
+#' @keywords Internal
+.cdat_from_mixed <- function(f1, f2,
+                             chrpos,
+                             verbose = TRUE)
 {
   if (file.exists(f1)) {
     vcf <- f1
@@ -741,19 +750,122 @@ harmonise <- function(exposure,
   }
 
   # First, get data from vcf file
-  vcf_range <- gwasvcf::query_gwas(VariantAnnotation::readVcf(vcf), chrompos = c(chrpos))
+  vcffile <- VariantAnnotation::readVcf(vcf)
+  vcf_range <- gwasvcf::query_gwas(vcffile, chrompos = c(chrpos))
 
   if (length(vcf_range) < 1) {
     .print_msg(paste0("No data extracted from vcf file: \"", vcf, "\" for range: \"", chrpos, "\". Cannot run coloc for this dataset."), verbose = verbose)
     return(NA)
   }
 
+  # Code from gwasglue::gwasvcf_to_coloc()
   tab1 <- vcf_range %>%
     gwasvcf::vcf_to_tibble()
+
+  type1 <- ifelse(VariantAnnotation::header(vcffile) %>%
+                    VariantAnnotation::meta() %>%
+                    {.[["SAMPLE"]][["StudyType"]]} == "Continuous", "quant", "cc")
+
+  # No header? Try to determine from present data
+  if (length(type1) == 0) {
+    if ("NC" %in% names(tab1) && !all(is.na(tab1$NC))) {
+      type1 <- "cc"
+    } else {
+      type1 <- "quant"
+    }
+  }
+
+  tab1$AF[is.na(tab1$AF)] <- 0.5
 
   # Next, from OpenGWAS
   opengwas_range <- ieugwasr::associations(id = f2, variants = chrpos) %>%
     subset(., !duplicated(rsid))
 
-  browser()
+  if (length(opengwas_range) < 1 || nrow(opengwas_range) < 1) {
+    .print_msg(paste0("No data extracted from OpenGWAS ID: \"", opengwas, "\" for range: \"", chrpos, "\". Cannot run coloc for this dataset."), verbose = verbose)
+    return(NA)
+  }
+
+  # Code from gwasglue::ieugwasr_to_coloc()
+  tab2 <- opengwas_range
+
+  tab2$eaf <- as.numeric(tab2$eaf)
+  tab2$eaf[which(tab2$eaf > 0.5)] <- 1 - tab2$eaf[which(tab2$eaf > 0.5)]
+  s <- sum(is.na(tab2$eaf))
+  if(s > 0)
+  {
+    .print_msg(paste0(s, " out of ", nrow(tab2), " variants have missing allele frequencies in ", opengwas, ". Setting to 0.5"), verbose = verbose)
+    tab2$eaf[is.na(tab2$eaf)] <- 0.5
+  }
+
+  info2 <- ieugwasr::gwasinfo(opengwas)
+  if (is.na(info2$unit)) {
+    if (!("ncase" %in% names(info2))) {
+      info2$ncase <- NA
+    }
+
+    if (is.na(info2$ncase)) {
+      type2 <- "quant"
+    } else {
+      type2 <- "cc"
+    }
+  } else {
+    type2 <- ifelse(info2$unit %in% c("logOR", "log odds"), "cc", "quant")
+  }
+
+  tab2$n[is.na(tab2$n)] <- info2$sample_size
+
+  # Get overlap
+  # TODO Needs to be made better!
+  #index <- as.character(tab1$REF) == as.character(tab2$ea) &
+  #  as.character(tab1$ALT) == as.character(tab2$nea) &
+  #  as.character(tab1$seqnames) == as.character(tab2$rsid) &
+  #  tab1$start == tab2$position
+  tab1 <- tab1[tab1$rsid %in% tab2$rsid, ]
+  tab2 <- tab2[tab2$rsid %in% tab1$rsid, ]
+
+  if (nrow(tab1) < 1 || nrow(tab2) < 1) {
+    .print_msg(paste0("No SNPs matched based on rsID between \"", vcf, "\" and \"", opengwas, "\". Skipping coloc analysis for this pair."), verbose = verbose)
+    return(NA)
+  }
+
+  out1 <- tab1 %>%
+    { list(pvalues = 10^-.$LP,
+           N = .$SS,
+           MAF = .$AF,
+           beta = .$ES,
+           varbeta = .$SE^2,
+           type = type1,
+           snp = .$rsid,
+           z = .$ES / .$SE,
+           chr = .$seqnames,
+           pos = .$start,
+           id = vcf)
+    }
+
+  if(type1 == "cc")
+  {
+    out1$s <- mean(tab1$NC / tab1$SS, na.rm=TRUE)
+  }
+
+  out2 <- tab2 %>%
+    { list(pvalues = .$p,
+           N = .$n,
+           MAF = .$eaf,
+           beta = .$beta,
+           varbeta = .$se^2,
+           type = type2,
+           snp = .$rsid,
+           z = .$beta / .$se,
+           chr = .$chr,
+           pos = .$position,
+           id = opengwas)
+    }
+
+  if(type2 == "cc")
+  {
+    out2$s <- info2$ncase / info2$sample_size
+  }
+
+  return(list(dataset1 = out1, dataset2 = out2))
 }

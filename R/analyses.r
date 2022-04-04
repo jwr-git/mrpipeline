@@ -351,7 +351,7 @@ do_coloc <- function(dat,
         cdat <- gwasglue::ieugwasr_to_coloc(f1, f2, chrpos)
       } else {
         # One is file, one is not
-        .cdat_from_file_opengwas(f1, f2, chrpos, verbose)
+        cdat <- .cdat_from_mixed(f1, f2, chrpos, verbose)
       }
 
       if (all(is.na(cdat))) {
