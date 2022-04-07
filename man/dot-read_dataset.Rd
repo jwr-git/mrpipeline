@@ -10,6 +10,8 @@
   pval = 5e-08,
   proxies = TRUE,
   proxy_rsq = 0.8,
+  proxy_kb = 5000,
+  proxy_nsnp = 5000,
   plink = NULL,
   bfile = NULL,
   clump_r2 = 0.01,
@@ -17,6 +19,7 @@
   pop = "EUR",
   type = "exposure",
   cores = 1,
+  cores_proxy = 1,
   verbose = TRUE
 )
 }
@@ -30,6 +33,10 @@
 \item{proxies}{Whether to search for proxies (Optional, boolean)}
 
 \item{proxy_rsq}{R2 threshold to use when searching for proxies (Optional)}
+
+\item{proxy_kb}{kb threshold to use when searching for proxies (Optional)}
+
+\item{proxy_nsnp}{Number of SNPs when searching for proxies (Optional)}
 
 \item{plink}{Path to Plink binary (Optional)}
 
@@ -45,6 +52,10 @@
 
 \item{cores}{Number of cores for multi-threaded tasks (Optional)
 NB: Unavailable on Windows machines}
+
+\item{cores_proxy}{Number of cores for multi-threaded proxy searching (Optional)
+NB: Unavailable on Windows machines
+NB: Should not be more than `cores` argument!}
 
 \item{verbose}{Display verbose information (Optional, boolean)}
 }

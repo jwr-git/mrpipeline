@@ -242,10 +242,15 @@ read_exposure <- function(ids,
 #' @param rsids List of SNP rsIDs to extract
 #' @param proxies Whether to search for proxies (Optional, boolean)
 #' @param proxy_rsq R2 threshold to use when searching for proxies (Optional)
+#' @param proxy_kb kb threshold to use when searching for proxies (Optional)
+#' @param proxy_nsnp Number of SNPs when searching for proxies (Optional)
 #' @param plink Path to Plink binary (Optional)
 #' @param bfile Path to Plink .bed/.bim/.fam files (Optional)
 #' @param cores Number of cores for multi-threaded tasks (Optional)
 #'              NB: Unavailable on Windows machines
+#' @param cores_proxy Number of cores for multi-threaded proxy searching (Optional)
+#'                    NB: Unavailable on Windows machines
+#'                    NB: Should not be more than `cores` argument!
 #' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return Data.frame of outcome datasets
@@ -254,9 +259,12 @@ read_outcome <- function(ids,
                          rsids,
                          proxies = TRUE,
                          proxy_rsq = 0.8,
+                         proxy_kb = 5000,
+                         proxy_nsnp = 5000,
                          plink = NULL,
                          bfile = NULL,
                          cores = 1,
+                         cores_proxy = 1,
                          verbose = TRUE)
 {
   out <- .read_dataset(ids = ids,
@@ -284,6 +292,8 @@ read_outcome <- function(ids,
 #' @param pval Threshold to extract SNPs (Optional)
 #' @param proxies Whether to search for proxies (Optional, boolean)
 #' @param proxy_rsq R2 threshold to use when searching for proxies (Optional)
+#' @param proxy_kb kb threshold to use when searching for proxies (Optional)
+#' @param proxy_nsnp Number of SNPs when searching for proxies (Optional)
 #' @param plink Path to Plink binary (Optional)
 #' @param bfile Path to Plink .bed/.bim/.fam files (Optional)
 #' @param clump_r2 r2 threshold for clumping SNPs (Optional)
@@ -292,6 +302,9 @@ read_outcome <- function(ids,
 #' @param type Type of data (Optional, "exposure" or "outcome")
 #' @param cores Number of cores for multi-threaded tasks (Optional)
 #'              NB: Unavailable on Windows machines
+#' @param cores_proxy Number of cores for multi-threaded proxy searching (Optional)
+#'                    NB: Unavailable on Windows machines
+#'                    NB: Should not be more than `cores` argument!
 #' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return Data.frame of datasets
@@ -305,6 +318,8 @@ read_outcome <- function(ids,
                           pval = 5e-8,
                           proxies = TRUE,
                           proxy_rsq = 0.8,
+                          proxy_kb = 5000,
+                          proxy_nsnp = 5000,
                           plink = NULL,
                           bfile = NULL,
                           clump_r2 = 0.01,
@@ -312,6 +327,7 @@ read_outcome <- function(ids,
                           pop = "EUR",
                           type = "exposure",
                           cores = 1,
+                          cores_proxy = 1,
                           verbose = TRUE)
 {
   if (Sys.info()['sysname'] == "Windows") {
@@ -319,6 +335,7 @@ read_outcome <- function(ids,
     .print_msg("Local clumping, proxy searching and other Plink operations; parallelisation.", verbose)
     plink <- NULL
     cores <- 1
+    cores_proxy <- 1
   }
 
   if (is.null(rsids) && is.null(pval)) {
@@ -346,6 +363,14 @@ read_outcome <- function(ids,
     rsids <- unique(rsids)
   }
 
+  if (cores_proxy > cores) {
+    cores <- cores / 2 # Halve cores
+    cores_proxy <- cores / 4 # And give two cores per to proxying
+    .print_msg(paste0("Number of cores to use for proxy searching (", cores_proxy, ") is more than total cores (", cores, "). Reducing."), verbose)
+  } else if (cores_proxy > 1) {
+    cores <- cores / cores_proxy
+  }
+
   local_clump <- proxies <- !(is.null(plink) && is.null(bfile))
 
   dat <- parallel::mclapply(1:length(ids), function(i)
@@ -365,9 +390,10 @@ read_outcome <- function(ids,
                                    rsid = rsids,
                                    proxies = ifelse(proxies == TRUE, "yes", "no"),
                                    bfile = bfile,
-                                   tag_kb = tag_kb,
-                                   tag_nsnp = tag_nsnp,
-                                   tag_r2 = tag_r2)
+                                   tag_kb = proxy_kb,
+                                   tag_nsnp = proxy_nsnp,
+                                   tag_r2 = proxy_rsq,
+                                   threads = cores_proxy)
       }
 
       if (!exists("dat") || !length(dat)) {
