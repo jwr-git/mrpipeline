@@ -9,45 +9,53 @@
 #'
 #' @param dat Data.frame from do_mr()
 #' @param f_cutoff F-statistic cutoff (Optional)
+#' @param force_approx Force to use the approximate F-statistic instead (Optional, boolean)
 #' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return Modified `dat` data.frame (if f_cutoff > 0 supplied)
 #' @export
-calc_f_stat <- function(dat, f_cutoff = 10, verbose = TRUE)
+calc_f_stat <- function(dat, f_cutoff = 10, force_approx = FALSE, verbose = TRUE)
 {
-  full.f.stat <- T
+  dat <- plyr::ddply(dat, c("id.exposure"), function(x)
+  {
+    full.f.stat <- !force_approx
 
-  if (any(is.na(dat$eaf.exposure))) {
-    warning("Using approximate F-statistic as some allele frequencies are missing.")
-    full.f.stat <- F
-  }
-  else if (any(is.na(dat$samplesize.exposure))) {
-    warning("Using approximate F-statistic as some sample sizes are missing.")
-    full.f.stat <- F
-  }
-  else if (length(unique(dat$SNP)) == 1) {
-    full.f.stat <- F
-  }
+    if (full.f.stat)
+    {
+      if (any(is.na(x$eaf.exposure))) {
+        warning("Using approximate F-statistic as some allele frequencies are missing.")
+        full.f.stat <- F
+      }
+      else if (any(is.na(x$samplesize.exposure))) {
+        warning("Using approximate F-statistic as some sample sizes are missing.")
+        full.f.stat <- F
+      }
+      else if (length(unique(x$SNP)) == 1) {
+        full.f.stat <- F
+      }
+    }
 
-  # PVE / F-statistic
-  if (full.f.stat) {
-    dat$maf.exposure <- ifelse(dat$eaf.exposure < 0.5, dat$eaf.exposure, 1 - dat$eaf.exposure)
-    dat$pve.exposure <- mapply(.calc_pve,
-                               dat$beta.exposure,
-                               dat$maf.exposure,
-                               dat$se.exposure,
-                               dat$samplesize.exposure)
-    # From https://doi.org/10.1093/ije/dyr036
-    dat$f.stat.exposure <- ifelse(dat$pve.exposure == -1, 0,
-                                  ((dat$samplesize.exposure - length(unique(dat$SNP)) - 1) / length(unique(dat$SNP))) * (dat$pve.exposure / (1 - dat$pve.exposure)))
-  } else {
-    .print_msg("Using approximate F-statistic as no allele frequency has been provided.", verbose)
-    dat$f.stat.exposure <- dat$beta.exposure ** 2 / dat$se.exposure ** 2
-  }
+    # PVE / F-statistic
+    if (full.f.stat) {
+      x$maf.exposure <- ifelse(x$eaf.exposure < 0.5, x$eaf.exposure, 1 - x$eaf.exposure)
+      x$pve.exposure <- mapply(.calc_pve,
+                               x$beta.exposure,
+                               x$maf.exposure,
+                               x$se.exposure,
+                               x$samplesize.exposure)
+      # From https://doi.org/10.1093/ije/dyr036
+      x$f.stat.exposure <- ifelse(x$pve.exposure == -1, 0,
+                                    ((x$samplesize.exposure - length(unique(x$SNP)) - 1) / length(unique(x$SNP))) * (x$pve.exposure / (1 - x$pve.exposure)))
+    } else {
+      x$maf.exposure <- NA
+      x$pve.exposure <- NA
+      x$f.stat.exposure <- x$beta.exposure ** 2 / x$se.exposure ** 2
+    }
+    x
+  })
 
   rem.f.stat <- nrow(dat[dat$f.stat.exposure < f_cutoff, ])
   .print_msg(paste0("Amount of SNPs which did not meet threshold: ", rem.f.stat), verbose)
-
   #dat <- dat[dat$f.stat.exposure >= f_cutoff & !is.na(dat$f.stat.exposure), ]
 
   return(dat)
