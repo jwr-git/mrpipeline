@@ -4,12 +4,14 @@
 \alias{calc_f_stat}
 \title{Calculate F-statistic}
 \usage{
-calc_f_stat(dat, f_cutoff = 10, verbose = TRUE)
+calc_f_stat(dat, f_cutoff = 10, force_approx = FALSE, verbose = TRUE)
 }
 \arguments{
 \item{dat}{Data.frame from do_mr()}
 
 \item{f_cutoff}{F-statistic cutoff (Optional)}
+
+\item{force_approx}{Force to use the approximate F-statistic instead (Optional, boolean)}
 
 \item{verbose}{Display verbose information (Optional, boolean)}
 }

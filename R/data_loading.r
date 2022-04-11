@@ -165,7 +165,8 @@ dat_to_gwasvcf <- function(dat,
       return(NA)
     })
 
-  VariantAnnotation::writeVcf(vcf, file = out)
+  VariantAnnotation::writeVcf(vcf, file = out, index = TRUE)
+  gwasvcf::create_rsidx_index_from_vcf(paste0(out, ".bgz"), paste0(file_path_sans_ext(out), ".rsidx"))
   return(out)
 }
 
