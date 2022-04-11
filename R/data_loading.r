@@ -145,6 +145,10 @@ dat_to_gwasvcf <- function(dat,
     name_col <- NA
   }
 
+  # Cannot have duplicated rsIDs
+  # TODO maybe this could be improved somehow?
+  dat <- dat[!duplicated(dat$rsid), ]
+
   attempt <- tryCatch(
     expr = {
       vcf <- gwasvcf::create_vcf(chrom = dat[[chr_col]],
