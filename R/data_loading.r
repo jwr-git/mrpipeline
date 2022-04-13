@@ -171,7 +171,7 @@ dat_to_gwasvcf <- function(dat,
     })
 
   VariantAnnotation::writeVcf(vcf, file = out, index = TRUE)
-  gwasvcf::create_rsidx_index_from_vcf(paste0(out, ".bgz"), paste0(tools::file_path_sans_ext(out), ".rsidx"))
+  gwasvcf::create_rsidx_index_from_vcf(paste0(out, ".gz"), paste0(tools::file_path_sans_ext(out), ".rsidx"))
   return(out)
 }
 
@@ -384,7 +384,7 @@ read_outcome <- function(ids,
     id <- ids[i]
 
     # Extract data from local GWAS VCF format file
-    if (file.exists(id) && (tools::file_ext(id) == "vcf" || tools::file_ext(id) == "bgz"))
+    if (file.exists(id) && (tools::file_ext(id) == "vcf" || tools::file_ext(id) == "gz"))
     {
       .print_msg(paste0("Reading \"", id, "\" as GWAS VCF file."), verbose)
 
