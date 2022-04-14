@@ -384,7 +384,7 @@ read_outcome <- function(ids,
     id <- ids[i]
 
     # Extract data from local GWAS VCF format file
-    if (file.exists(id) && (tools::file_ext(id) == "vcf" || tools::file_ext(id) == "gz"))
+    if (file.exists(id) && (tools::file_ext(id) == "vcf" || tools::file_ext(id) == "bgz" || tools::file_ext(id) == "gz"))
     {
       .print_msg(paste0("Reading \"", id, "\" as GWAS VCF file."), verbose)
 
