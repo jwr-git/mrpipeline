@@ -149,8 +149,8 @@ dat_to_gwasvcf <- function(dat,
   # TODO maybe this could be improved somehow?
   dat <- dat[!duplicated(dat$rsid), ]
 
-  attempt <- tryCatch(
-    expr = {
+#  attempt <- tryCatch(
+#    expr = {
       vcf <- gwasvcf::create_vcf(chrom = dat[[chr_col]],
                             pos = dat[[pos_col]],
                             nea = dat[[nea_col]],
@@ -163,15 +163,15 @@ dat_to_gwasvcf <- function(dat,
                             n = ifelse(is.na(n_col), n, dat[[n_col]]),
                             ncase = ifelse(is.na(ncase_col), n_case, dat[[ncase_col]]),
                             name = ifelse(is.na(name_col), name, dat[[name_col]]))
-    },
-    error = function(e) {
-      .print_msg(paste0("Error creating vcf:"), verbose)
-      .print_msg(e, verbose)
-      return(NA)
-    })
+#    },
+#    error = function(e) {
+#      .print_msg(paste0("Error creating vcf:"), verbose)
+#      .print_msg(e, verbose)
+#      return(NA)
+#    })
 
   VariantAnnotation::writeVcf(vcf, file = out, index = TRUE)
-  gwasvcf::create_rsidx_index_from_vcf(paste0(out, ".gz"), paste0(tools::file_path_sans_ext(out), ".rsidx"))
+  gwasvcf::create_rsidx_index_from_vcf(paste0(out, ".bgz"), paste0(tools::file_path_sans_ext(out), ".rsidx"))
   return(out)
 }
 
