@@ -25,6 +25,7 @@ magrittr::`%>%`
 #' @param sep File separater (Optional)
 #' @param cores Number of cores for multi-threaded tasks (Optional)
 #'              NB: Unavailable on Windows machines
+#' @param bcf_tools Path to bcf_tools (Optional)
 #' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return gwasvcf object(s)
@@ -46,6 +47,7 @@ file_to_gwasvcf <- function(file,
                             header = TRUE,
                             sep = "\t",
                             cores = 1,
+                            bcf_tools = NULL,
                             verbose = TRUE
                             )
 {
@@ -71,7 +73,8 @@ file_to_gwasvcf <- function(file,
                   snp_col = snp_col, eaf_col = eaf_col, beta_col = beta_col,
                   se_col = se_col, pval_col = pval_col, n = n, n_case = n_case,
                   name = name,
-                  verbose = verbse)
+                  bcf_tools = bcf_tools,
+                  verbose = verbose)
   }, mc.cores = cores)
 
   return(outputs)
@@ -97,12 +100,14 @@ file_to_gwasvcf <- function(file,
 #' @param n Sample size (Optional), can be int or column name
 #' @param n_case Number of cases (Optional), can be int or column name
 #' @param name Trait name (Optional), can be string or column name
+#' @param bcf_tools Path to bcf_tools (Optional)
 #' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return gwasvcf object
-#' @importFrom gwasvcf create_vcf
+#' @importFrom gwasvcf create_vcf, create_rsidx_index_from_vcf
 #' @importFrom VariantAnnotation writeVcf
 #' @importFrom tools file_path_sans_ext
+#' @importFrom Rsamtools bgzip
 #' @export
 dat_to_gwasvcf <- function(dat,
                            out,
@@ -118,6 +123,7 @@ dat_to_gwasvcf <- function(dat,
                            n = NULL,
                            n_case = NULL,
                            name = NULL,
+                           bcf_tools = NULL,
                            verbose = TRUE)
 {
   if (nrow(dat) < 1) {
@@ -145,6 +151,11 @@ dat_to_gwasvcf <- function(dat,
     name_col <- NA
   }
 
+  # Attempt to set bcf_tools -- could be improved upon no doubt
+  if (!is.null(bcf_tools)) {
+    gwasvcf::set_bcftools(bcf_tools)
+  }
+
   # Cannot have duplicated rsIDs
   # TODO maybe this could be improved somehow?
   dat <- dat[!duplicated(dat$rsid), ]
@@ -170,9 +181,41 @@ dat_to_gwasvcf <- function(dat,
 #      return(NA)
 #    })
 
-  VariantAnnotation::writeVcf(vcf, file = out, index = TRUE)
-  gwasvcf::create_rsidx_index_from_vcf(paste0(out, ".bgz"), paste0(tools::file_path_sans_ext(out), ".rsidx"))
-  return(out)
+  VariantAnnotation::writeVcf(vcf, file = out)
+  if (gwasvcf::check_bcftools())
+  {
+    header_string <- "##SAMPLE=<"
+    header_string <- paste0(header_string, "TotalVariants=", nrow(dat))
+    header_string <- paste0(header_string, ",StudyType=", ifelse(is.na(ncase_col), "Continuous", "CaseControl"))
+    header_string <- paste0(header_string, ">")
+
+    # Save to header and write using bcf_tools
+    header_path <- tempfile()
+    fcon <- file(header_path)
+    writeLines(header_string, fcon)
+    close(fcon)
+
+    # Temp file
+    temp <- paste0(tools::file_path_sans_ext(out), ".temp.vcf")
+    cmd <- glue::glue("bcftools annotate -h {header_path} -o {temp} {out}")
+    system(cmd)
+
+    # Swap over as bcf_tools will not do this in place
+    if (file.exists(temp)) {
+      invisible(file.remove(out, showWarnings = F))
+      file.rename(temp, out)
+    }
+  }
+
+  # Some file fudgery
+  # .vcf -> .vcf.bgz -> index -> rsidx index
+  out.bgz <- paste0(out, ".bgz")
+  Rsamtools::bgzip(out, overwrite = T)
+  file.remove(out, showWarnings = F)
+  VariantAnnotation::indexVcf(out.bgz)
+  gwasvcf::create_rsidx_index_from_vcf(out.bgz, paste0(tools::file_path_sans_ext(out), ".rsidx"))
+
+  return(out.bgz)
 }
 
 #' Helper function for message printing.
