@@ -349,8 +349,9 @@ do_coloc <- function(dat,
   #  as.character(tab1$ALT) == as.character(tab2$nea) &
   #  as.character(tab1$seqnames) == as.character(tab2$rsid) &
   #  tab1$start == tab2$position
-  tab1 <- r1[r1$rsid %in% r2$rsid, ]
-  tab2 <- r2[r2$rsid %in% r1$rsid, ]
+  tab1 <- r1[r1$SNP %in% r2$SNP, ]
+  tab2 <- r2[r2$SNP %in% tab1$SNP, ]
+  tab1 <- tab1[tab1$SNP %in% tab2$SNP, ]
 
   if (nrow(tab1) < 1 || nrow(tab2) < 1) {
     .print_msg(paste0(".gwasvcf_to_coloc_rsid: No SNPs matched based on rsID between \"", vcf1, "\" and \"", vcf2, "\". Skipping coloc analysis for this pair."), verbose = verbose)

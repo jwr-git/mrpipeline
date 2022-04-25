@@ -898,6 +898,7 @@ harmonise <- function(exposure,
   #  tab1$start == tab2$position
   tab1 <- tab1[tab1$rsid %in% tab2$rsid, ]
   tab2 <- tab2[tab2$rsid %in% tab1$rsid, ]
+  tab1 <- tab1[tab1$rsid %in% tab2$rsid, ]
 
   if (nrow(tab1) < 1 || nrow(tab2) < 1) {
     .print_msg(paste0("No SNPs matched based on rsID between \"", vcf, "\" and \"", opengwas, "\". Skipping coloc analysis for this pair."), verbose = verbose)
