@@ -395,7 +395,7 @@ do_coloc <- function(dat,
 
   if(type1 == "cc")
   {
-    out1$s <- mean(tab1$NC / tab1$SS, na.rm=TRUE)
+    out1$s <- tab1$ncase.exposure / tab1$samplesize.exposure
   }
 
   out2 <- tab2 %>%
@@ -414,7 +414,7 @@ do_coloc <- function(dat,
 
   if(type2 == "cc")
   {
-    out2$s <- info2$ncase / info2$sample_size
+    out2$s <- tab2$ncase.outcome / tab2$samplesize.outcome
   }
 
   return(list(dataset1 = out1, dataset2 = out2))
