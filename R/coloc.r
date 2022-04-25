@@ -388,8 +388,8 @@ do_coloc <- function(dat,
            type = type1,
            snp = .$SNP,
            z = .$beta.exposure / .$se.exposure,
-           chr = .$chr.exposure,
-           pos = .$pos.exposure,
+           #chr = .$chr.exposure,
+           #pos = .$pos.exposure,
            id = vcf1)
     }
 
@@ -407,8 +407,8 @@ do_coloc <- function(dat,
            type = type2,
            snp = .$SNP,
            z = .$beta.outcome / .$se.outcome,
-           chr = .$chr.outcome,
-           pos = .$pos.outcome,
+           #chr = .$chr.outcome,
+           #pos = .$pos.outcome,
            id = vcf2)
     }
 
