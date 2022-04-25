@@ -142,12 +142,12 @@ do_coloc <- function(dat,
   # This is not vectorised but could be!
   coloc.df <- tibble::tibble(file.exposure = character(),
                              file.outcome = character(),
-                             nsnps = numeric(),
-                             PP.H0.abf = numeric(),
-                             PP.H1.abf = numeric(),
-                             PP.H2.abf = numeric(),
-                             PP.H3.abf = numeric(),
-                             PP.H4.abf = numeric())
+                             nsnps = character(),
+                             PP.H0.abf = character(),
+                             PP.H1.abf = character(),
+                             PP.H2.abf = character(),
+                             PP.H3.abf = character(),
+                             PP.H4.abf = character())
   for (i in 1:length(coloc_res)) {
     if (all(is.na(coloc_res[[i]]))) {
       next
@@ -368,12 +368,12 @@ do_coloc <- function(dat,
   tab2$maf.outcome <- ifelse(is.null(tab2$maf.outcome), 0.5, tab2$maf.outcome)
 
   # Attempt to determine from data types
-  if (is.null(type1) && "ncase.exposure" %in% names(tab1) && all(is.numeric(tab1$ncase.exposure))) {
+  if (is.null(type1) && "ncase.exposure" %in% names(tab1) && all(!is.na(tab1$ncase.exposure))) {
     type1 <- "cc"
   } else {
     type1 <- "quant"
   }
-  if (is.null(type2) && "ncase.outcome" %in% names(tab2) && all(is.numeric(tab2$ncase.outcome))) {
+  if (is.null(type2) && "ncase.outcome" %in% names(tab2) && all(!is.na(tab2$ncase.outcome))) {
     type2 <- "cc"
   } else {
     type2 <- "quant"
