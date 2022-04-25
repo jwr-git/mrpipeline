@@ -336,7 +336,7 @@ do_coloc <- function(dat,
     return(NA)
   }
   r1 <- r1 %>% gwasglue::gwasvcf_to_TwoSampleMR() %>%
-    tidyr::drop_na()
+    tidyr::drop_na(pval.exposure, samplesize.exposure, beta.exposure, se.exposure, pval.exposure, SNP)
 
   r2 <- gwasvcf::query_gwas(vcf2, rsid = unique(r1$SNP), build = build2)
   if (length(r2) < 1) {
@@ -344,7 +344,7 @@ do_coloc <- function(dat,
     return(NA)
   }
   r2 <- r2 %>% gwasglue::gwasvcf_to_TwoSampleMR(type = "outcome") %>%
-    tidyr::drop_na()
+    tidyr::drop_na(pval.outcome, samplesize.outcome, beta.outcome, se.outcome, pval.outcome, SNP)
 
   # Get overlap
   # TODO Needs to be made better!
