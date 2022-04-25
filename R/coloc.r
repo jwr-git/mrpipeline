@@ -318,6 +318,7 @@ do_coloc <- function(dat,
 #' @param chrompos Character of the format chr:pos1-pos2
 #'
 #' @return list of coloc-ready data, or NA if failed
+#' @importFrom tidyr drop_na
 #' @keywords Internal
 .gwasvcf_to_coloc_rsid <- function(vcf1, vcf2, chrompos,
                                    type1 = NULL, type2 = NULL,
@@ -334,14 +335,16 @@ do_coloc <- function(dat,
     .pring_msg(paste0(".gwasvcf_to_coloc_rsid: Could not extract SNPs in region \"", chrompos, "\" for file, \"", vcf1, "\". Skipping."), verbose)
     return(NA)
   }
-  r1 <- r1 %>% gwasglue::gwasvcf_to_TwoSampleMR()
+  r1 <- r1 %>% gwasglue::gwasvcf_to_TwoSampleMR() %>%
+    tidyr::drop_na()
 
   r2 <- gwasvcf::query_gwas(vcf2, rsid = unique(r1$SNP), build = build2)
   if (length(r2) < 1) {
     .pring_msg(paste0(".gwasvcf_to_coloc_rsid: Could not extract SNPs in region \"", chrompos, "\" for file, \"", vcf2, "\". Skipping."), verbose)
     return(NA)
   }
-  r2 <- r2 %>% gwasglue::gwasvcf_to_TwoSampleMR(type = "outcome")
+  r2 <- r2 %>% gwasglue::gwasvcf_to_TwoSampleMR(type = "outcome") %>%
+    tidyr::drop_na()
 
   # Get overlap
   # TODO Needs to be made better!
@@ -386,7 +389,7 @@ do_coloc <- function(dat,
            snp = .$SNP,
            z = .$beta.exposure / .$se.exposure,
            chr = .$chr.exposure,
-           pos = .$position.exposure,
+           pos = .$pos.exposure,
            id = vcf1)
     }
 
@@ -405,7 +408,7 @@ do_coloc <- function(dat,
            snp = .$SNP,
            z = .$beta.outcome / .$se.outcome,
            chr = .$chr.outcome,
-           pos = .$position.outcome,
+           pos = .$pos.outcome,
            id = vcf2)
     }
 
