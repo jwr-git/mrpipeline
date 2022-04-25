@@ -87,7 +87,7 @@ do_coloc <- function(dat,
     if (method == "coloc.abf" || method == "coloc.susie") {
       if (file.exists(f1) && file.exists(f2))
       {
-        cdat <- gwasglue::gwasvcf_to_coloc(f1, f2, chrpos)
+        cdat <- .gwasvcf_to_coloc_rsid(f1, f2, chrpos)
       } else if (!file.exists(f1) && !file.exists(f2))
       {
         cdat <- gwasglue::ieugwasr_to_coloc(f1, f2, chrpos)
@@ -206,11 +206,13 @@ do_coloc <- function(dat,
   # Even after merge, if any MAF are missing, it's probs
   # best to ignore this coloc
   # TODO - better way of dealing with this?
-  if (all(is.na(dat1$MAF)) || all(is.na(dat2$MAF)))
-  {
-    .print_msg("Minor allele frequenices are required for coloc but were not found in these datasets.", verbose)
-    return(NULL)
-  }
+  #if (all(is.na(dat1$MAF)) || all(is.na(dat2$MAF)))
+  #{
+  #  .print_msg("Minor allele frequenices are required for coloc but were not found in these datasets.", verbose)
+  #  return(NULL)
+  #}
+  dat1[is.na(dat1$MAF)] <- 0.5
+  dat2[is.na(dat2$MAF)] <- 0.5
 
   if (length(dat1$snp) < min_snps || length(dat2$snp) < min_snps)
   {
@@ -285,7 +287,7 @@ do_coloc <- function(dat,
 
   if (inherits(attempt, "error"))
   {
-    .print_msg("No LD matrix generated for coloc with SuSiE; running only coloc.", verbose)
+    .print_msg(".coloc_susie_sub: No LD matrix generated for coloc with SuSiE; running only coloc.", verbose)
     return(NA)
   }
 
@@ -304,6 +306,114 @@ do_coloc <- function(dat,
   s2 <- coloc::runsusie(d2)
 
   return(coloc::coloc.susie(s1, s2, p1 = p1, p2 = p2, p12 = p12, ...))
+}
+
+#' Prepare gwasvcf files for coloc.
+#' This method will extract SNPs from one file using one chrompos and then look
+#' up those SNPs in the other file -- this is to ensure coloc can be conducted
+#' upon two datasets of different genomic builds without the need of liftover.
+#'
+#' @param vcf1 VCF object or path to vcf file
+#' @param vcf2 VCF object or path to vcf file
+#' @param chrompos Character of the format chr:pos1-pos2
+#'
+#' @return list of coloc-ready data, or NA if failed
+#' @keywords Internal
+.gwasvcf_to_coloc_rsid <- function(vcf1, vcf2, chrompos,
+                                   type1 = NULL, type2 = NULL,
+                                   build1 = "GRCh37", build2 = "GRCh37",
+                                   verbose = TRUE)
+{
+  if (is.character(vcf1)) {
+    r1 <- gwasvcf::query_chrompos_file(chrompos, vcf1, build = build1)
+  }
+  else if (class(vcf1) %in% c("CollapsedVCF", "ExpandedVCF")) {
+    r1 <- gwasvcf::query_chrompos_vcf(chrompos, vcf1)
+  }
+  if (length(r1) < 1) {
+    .pring_msg(paste0(".gwasvcf_to_coloc_rsid: Could not extract SNPs in region \"", chrompos, "\" for file, \"", vcf1, "\". Skipping."), verbose)
+    return(NA)
+  }
+  r1 <- r1 %>% gwasglue::gwasvcf_to_TwoSampleMR()
+
+  r2 <- gwasvcf::query_gwas(vcf2, rsid = unique(r1$SNP), build = build2)
+  if (length(r2) < 1) {
+    .pring_msg(paste0(".gwasvcf_to_coloc_rsid: Could not extract SNPs in region \"", chrompos, "\" for file, \"", vcf2, "\". Skipping."), verbose)
+    return(NA)
+  }
+  r2 <- r2 %>% gwasglue::gwasvcf_to_TwoSampleMR(type = "outcome")
+
+  # Get overlap
+  # TODO Needs to be made better!
+  #index <- as.character(tab1$REF) == as.character(tab2$ea) &
+  #  as.character(tab1$ALT) == as.character(tab2$nea) &
+  #  as.character(tab1$seqnames) == as.character(tab2$rsid) &
+  #  tab1$start == tab2$position
+  tab1 <- r1[r1$rsid %in% r2$rsid, ]
+  tab2 <- r2[r2$rsid %in% r1$rsid, ]
+
+  if (nrow(tab1) < 1 || nrow(tab2) < 1) {
+    .print_msg(paste0(".gwasvcf_to_coloc_rsid: No SNPs matched based on rsID between \"", vcf1, "\" and \"", vcf2, "\". Skipping coloc analysis for this pair."), verbose = verbose)
+    return(NA)
+  }
+
+  # Need to convert AF to MAF
+  tab1$maf.exposure <- ifelse(tab1$eaf.exposure > 0.5, 1 - tab1$eaf.exposure, tab1$eaf.exposure)
+  tab1$maf.exposure <- ifelse(is.null(tab1$maf.exposure), 0.5, tab1$maf.exposure)
+  tab2$maf.outcome <- ifelse(tab2$eaf.outcome > 0.5, 1 - tab2$eaf.outcome, tab2$eaf.outcome)
+  tab2$maf.outcome <- ifelse(is.null(tab2$maf.outcome), 0.5, tab2$maf.outcome)
+
+  # Attempt to determine from data types
+  if (is.null(type1) && "ncase.exposure" %in% names(tab1) && all(is.numeric(tab1$ncase.exposure))) {
+    type1 <- "cc"
+  } else {
+    type1 <- "quant"
+  }
+  if (is.null(type2) && "ncase.exposure" %in% names(tab2) && all(is.numeric(tab2$ncase.exposure))) {
+    type2 <- "cc"
+  } else {
+    type2 <- "quant"
+  }
+
+  out1 <- tab1 %>%
+    { list(pvalues = 10^-.$pval.exposure,
+           N = .$samplesize.exposure,
+           MAF = .$maf.exposure,
+           beta = .$beta.exposure,
+           varbeta = .$se.exposure^2,
+           type = type1,
+           snp = .$SNP,
+           z = .$beta.exposure / .$se.exposure,
+           chr = .$chr.exposure,
+           pos = .$position.exposure,
+           id = vcf1)
+    }
+
+  if(type1 == "cc")
+  {
+    out1$s <- mean(tab1$NC / tab1$SS, na.rm=TRUE)
+  }
+
+  out2 <- tab2 %>%
+    { list(pvalues = 10^-.$pval.outcome,
+           N = .$samplesize.outcome,
+           MAF = .$maf.outcome,
+           beta = .$beta.outcome,
+           varbeta = .$se.outcome^2,
+           type = type2,
+           snp = .$SNP,
+           z = .$beta.outcome / .$se.outcome,
+           chr = .$chr.outcome,
+           pos = .$position.outcome,
+           id = vcf2)
+    }
+
+  if(type2 == "cc")
+  {
+    out2$s <- info2$ncase / info2$sample_size
+  }
+
+  return(list(dataset1 = out1, dataset2 = out2))
 }
 
 #' Prepare gwasvcf files for PWCoCo
@@ -327,13 +437,13 @@ do_coloc <- function(dat,
 
   if (length(vcf1) == 0 || length(vcf2) == 0)
   {
-    message("No overlaps for the given chrompos in ", ifelse(length(vcf1) == 0, "vcf1", "vcf2"), ".")
+    message(".gwasvcf_to_pwcoco: No overlaps for the given chrompos in ", ifelse(length(vcf1) == 0, "vcf1", "vcf2"), ".")
     return(1)
   }
 
   # vcf1
   tib1 <- vcf1 %>% gwasvcf::vcf_to_granges() %>% dplyr::as_tibble() %>%
-    dplyr::select(rsid, ALT, REF, AF, ES, SE, LP, SS, NC) %>%
+    dplyr::select(dplyr::any_of(c("rsid", "ALT", "REF", "AF", "ES", "SE", "LP", "SS", "NC"))) %>%
     dplyr::rename(
       SNP = rsid,
       A1 = ALT,
@@ -343,7 +453,8 @@ do_coloc <- function(dat,
       se = SE,
       p = LP,
       N = ss,
-      N_case = NC
+      N_case = NC,
+      .cols = dplyr::any_of()
     )
   tib1$p <- 10^(-tib1$p)
 
@@ -355,7 +466,7 @@ do_coloc <- function(dat,
 
   # vcf2
   tib2 <- vcf2 %>% gwasvcf::vcf_to_granges() %>% dplyr::as_tibble() %>%
-    dplyr::select(rsid, ALT, REF, AF, ES, SE, LP, SS, NC) %>%
+    dplyr::select(dplyr::any_of(c("rsid", "ALT", "REF", "AF", "ES", "SE", "LP", "SS", "NC"))) %>%
     dplyr::rename(
       SNP = rsid,
       A1 = ALT,
@@ -365,7 +476,8 @@ do_coloc <- function(dat,
       se = SE,
       p = LP,
       N = ss,
-      N_case = NC
+      N_case = NC,
+      .cols = dplyr::any_of()
     )
   tib2$p <- 10^(-tib2$p)
 
@@ -400,7 +512,7 @@ do_coloc <- function(dat,
 
   if (length(tib1) < 1 || length(tib2) < 1)
   {
-    message("Data could not be read using the ieugwasr package for id1 = ", id1, " and id2 = ", id2, ".")
+    message(".ieugwasr_to_pwcoco: Data could not be read using the ieugwasr package for id1 = ", id1, " and id2 = ", id2, ".")
     return(1)
   }
 
