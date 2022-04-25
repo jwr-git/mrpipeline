@@ -373,7 +373,7 @@ do_coloc <- function(dat,
   } else {
     type1 <- "quant"
   }
-  if (is.null(type2) && "ncase.exposure" %in% names(tab2) && all(is.numeric(tab2$ncase.exposure))) {
+  if (is.null(type2) && "ncase.outcome" %in% names(tab2) && all(is.numeric(tab2$ncase.outcome))) {
     type2 <- "cc"
   } else {
     type2 <- "quant"
