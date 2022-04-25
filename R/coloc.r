@@ -377,7 +377,7 @@ do_coloc <- function(dat,
   }
 
   out1 <- tab1 %>%
-    { list(pvalues = 10^-.$pval.exposure,
+    { list(pvalues = .$pval.exposure,
            N = .$samplesize.exposure,
            MAF = .$maf.exposure,
            beta = .$beta.exposure,
@@ -396,7 +396,7 @@ do_coloc <- function(dat,
   }
 
   out2 <- tab2 %>%
-    { list(pvalues = 10^-.$pval.outcome,
+    { list(pvalues = .$pval.outcome,
            N = .$samplesize.outcome,
            MAF = .$maf.outcome,
            beta = .$beta.outcome,
