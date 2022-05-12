@@ -162,7 +162,7 @@ volcano_plot <- function(res,
 #'                     result (\code{FALSE}).
 #'
 #' @return Plot
-#' @importFrom ggplot2 ggplot aes geom_point geom_errorbarh geom_vline facet_grid xlab ylab theme_bw
+#' @importFrom ggplot2 ggplot aes geom_point geom_errorbarh geom_vline facet_grid xlab ylab theme_bw theme
 #' @export
 forest_plot <- function(res,
                         snp_col = "snp",
