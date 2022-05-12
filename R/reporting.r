@@ -1,3 +1,12 @@
+#' Combine MR and coloc results into one data.frame
+#'
+#' @param mr_res A data.frame of MR results from `do_mr()`
+#' @param coloc_res A data.frame of coloc results from `do_coloc()`
+#' @param mr_res.by MR columns to use for merging
+#' @param coloc_res.by Coloc columns to use for merging
+#'
+#' @return Data.frame of merged results
+#' @export
 combine_results <- function(mr_res,
                             coloc_res,
                             mr_res.by = c("id.exposure", "id.outcome"),
@@ -23,6 +32,5 @@ combine_results <- function(mr_res,
   }
 
   merged <- base::merge(mr_res, coloc_res.df, by.x = mr_res.by, by.y = coloc_res.by, all.x = TRUE)
+  return(merged)
 }
-
-

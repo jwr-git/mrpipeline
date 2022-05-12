@@ -162,7 +162,7 @@ volcano_plot <- function(res,
 #'                     result (\code{FALSE}).
 #'
 #' @return Plot
-#' @importFrom ggplot2 ggplot aes geom_point geom_errorbarh geom_vline facet_grid xlab ylab theme_bw theme
+#' @importFrom ggplot2 ggplot aes geom_point geom_errorbarh geom_vline facet_grid xlab ylab theme_bw theme element_text
 #' @export
 forest_plot <- function(res,
                         snp_col = "snp",
@@ -213,18 +213,18 @@ forest_plot <- function(res,
 
   p <- to_plot %>%
     dplyr::arrange((!!exposure_col), (!!outcome_col), desc(label)) %>%
-    ggplot(data = .,
-           aes(x = get(or_col),
-               y = label,
-               group = interaction(get(exposure_col), get(outcome_col)))) +
-    geom_point(aes(shape = as.factor(shape))) +
-    geom_errorbarh(aes(xmin = get(or_lci_col), xmax = get(or_uci_col))) +
-    geom_vline(xintercept = 1, lty = 2) +
-    facet_grid(as.formula(paste(outcome_col, "+", exposure_col, "~.")), scales = "free", space = "free") +
-    xlab("Odds Ratio (95% CI)") +
-    ylab(" ") +
-    theme_bw() +
-    theme(strip.text.y = element_text(angle = 0), legend.position="none")
+    ggplot2::ggplot(data = .,
+                    ggplot2::aes(x = get(or_col),
+                                 y = label,
+                                 group = interaction(get(exposure_col), get(outcome_col)))) +
+    ggplot2::geom_point(ggplot2::aes(shape = as.factor(shape))) +
+    ggplot2::geom_errorbarh(ggplot2::aes(xmin = get(or_lci_col), xmax = get(or_uci_col))) +
+    ggplot2::geom_vline(xintercept = 1, lty = 2) +
+    ggplot2::facet_grid(as.formula(paste(outcome_col, "+", exposure_col, "~.")), scales = "free", space = "free") +
+    ggplot2::xlab("Odds Ratio (95% CI)") +
+    ggplot2::ylab(" ") +
+    ggplot2::theme_bw() +
+    ggplot2::theme(strip.text.y = ggplot2::element_text(angle = 0), legend.position="none")
 
   return(p)
 }

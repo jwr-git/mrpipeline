@@ -104,7 +104,7 @@ file_to_gwasvcf <- function(file,
 #' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return gwasvcf object
-#' @importFrom gwasvcf create_vcf, create_rsidx_index_from_vcf
+#' @importFrom gwasvcf create_vcf create_rsidx_index_from_vcf
 #' @importFrom VariantAnnotation writeVcf
 #' @importFrom tools file_path_sans_ext
 #' @importFrom Rsamtools bgzip

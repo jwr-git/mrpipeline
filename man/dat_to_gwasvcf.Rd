@@ -19,6 +19,7 @@ dat_to_gwasvcf(
   n = NULL,
   n_case = NULL,
   name = NULL,
+  bcf_tools = NULL,
   verbose = TRUE
 )
 }
@@ -51,6 +52,8 @@ NB: P values will be saved as 10^-P}
 \item{n_case}{Number of cases (Optional), can be int or column name}
 
 \item{name}{Trait name (Optional), can be string or column name}
+
+\item{bcf_tools}{Path to bcf_tools (Optional)}
 
 \item{verbose}{Display verbose information (Optional, boolean)}
 }

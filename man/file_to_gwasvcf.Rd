@@ -21,6 +21,7 @@ file_to_gwasvcf(
   header = TRUE,
   sep = "\\t",
   cores = 1,
+  bcf_tools = NULL,
   verbose = TRUE
 )
 }
@@ -58,6 +59,8 @@ NB: P values will be saved as 10^-P}
 
 \item{cores}{Number of cores for multi-threaded tasks (Optional)
 NB: Unavailable on Windows machines}
+
+\item{bcf_tools}{Path to bcf_tools (Optional)}
 
 \item{verbose}{Display verbose information (Optional, boolean)}
 }
