@@ -733,7 +733,7 @@ cis_trans <- function(dat,
     return(dat)
   }
 
-  results <- biomart::getBM(attributes = c("ensembl_gene_id", "hgnc_symbol", "chromosome_name", "start_position", "end_position"),
+  results <- biomaRt::getBM(attributes = c("ensembl_gene_id", "hgnc_symbol", "chromosome_name", "start_position", "end_position"),
                             filters = filter,
                             values = unique(dat[[values_col]]),
                             mart = mart.gene)
