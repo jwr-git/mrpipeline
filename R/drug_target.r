@@ -11,6 +11,7 @@
 #'
 #' @return data.frame of results
 #' @export
+#' @importFrom dplyr bind_rows
 drug_target_evidence <- function(dat,
                                  ensg_col = "exposure")
 {
@@ -48,6 +49,9 @@ drug_target_evidence <- function(dat,
 #'
 #' @return data.frame of results
 #' @keywords Internal
+#' @importFrom tibble as_tibble add_column
+#' @importFrom dplyr rename
+#' @importFrom utils URLencode
 .dgidb_linkage <- function(ensgs)
 {
   interactions <- c("DRUGGABLE GENOME", "CLINICALLY ACTIONABLE", "DRUG RESISTANT")

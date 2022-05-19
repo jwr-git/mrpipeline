@@ -23,6 +23,10 @@
 #'
 #' @return A data.frame of colocalistion results
 #' @export
+#' @importFrom tidyr crossing
+#' @importFrom parallel mclapply
+#' @importFrom gwasglue ieugwasr_to_coloc
+#' @importFrom tibble tibble
 do_coloc <- function(dat,
                      method = "coloc.abf",
                      coloc_window = 500000,
@@ -181,6 +185,8 @@ do_coloc <- function(dat,
 #'
 #' @return Results data.frame
 #' @keywords Internal
+#' @importFrom dplyr coalesce
+#' @importFrom coloc coloc.abf
 .coloc_sub <- function(dat1, dat2,
                        min_snps = 100,
                        p1 = 1e-4,
@@ -268,6 +274,8 @@ do_coloc <- function(dat,
 #'
 #' @return Results data.frame
 #' @keywords Internal
+#' @importFrom ieugwasr ld_matrix_local
+#' @importFrom coloc runsusie coloc.susie
 .coloc_susie_sub <- function(d1, d2,
                              bfile = NULL,
                              plink = NULL,
@@ -319,6 +327,8 @@ do_coloc <- function(dat,
 #'
 #' @return list of coloc-ready data, or NA if failed
 #' @importFrom tidyr drop_na
+#' @importFrom gwasvcf query_chrompos_file query_chrompos_vcf query_gwas
+#' @importFrom gwasglue gwasvcf_to_TwoSampleMR
 #' @keywords Internal
 .gwasvcf_to_coloc_rsid <- function(vcf1, vcf2, chrompos,
                                    type1 = NULL, type2 = NULL,
@@ -433,6 +443,9 @@ do_coloc <- function(dat,
 #'
 #' @return 0 if success, 1 if there was a problem
 #' @keywords Internal
+#' @importFrom gwasvcf vcflist_overlaps vcf_to_granges
+#' @importFrom dplyr as_tibble select rename any_of
+#' @importFrom VariantAnnotation header meta
 .gwasvcf_to_pwcoco <- function(vcf1, vcf2, chrompos, type1=NULL, type2=NULL, outfile)
 {
   overlap <- gwasvcf::vcflist_overlaps(list(vcf1, vcf2), chrompos)
@@ -509,6 +522,8 @@ do_coloc <- function(dat,
 #'
 #' @return 0 if success, 1 if there was a problem
 #' @keywords Internal
+#' @importFrom ieugwasr associations gwasinfo
+#' @importFrom dplyr select rename
 .ieugwasr_to_pwcoco <- function(id1, id2, chrompos, type1=NULL, type2=NULL, outfile)
 {
   tib1 <- ieugwasr::associations(id=id1, variants=chrompos) %>% subset(., !duplicated(rsid))
@@ -576,6 +591,8 @@ do_coloc <- function(dat,
 #'
 #' @return Results data.frame
 #' @keywords Internal
+#' @importFrom glue glue
+#' @importFrom data.table fread
 .pwcoco_sub <- function(bfile,
                         chrpos,
                         pwcoco,

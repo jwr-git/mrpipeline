@@ -14,6 +14,8 @@
 #'
 #' @return Plot
 #' @export
+#' @importFrom ggplot2 ggplot geom_point theme_bw aes geom_vline geom_hline xlab ylab ggtitle stat_smooth
+#' @importFrom plotly ggplotly
 z_plot <- function(dat,
                    snp_col = "SNP",
                    beta_col = "beta.exposure",
@@ -81,6 +83,8 @@ z_plot <- function(dat,
 #'
 #' @return Plot
 #' @export
+#' @importFrom plotly highlight_key plot_ly
+#' @importFrom ggplot2 ggplot aes geom_point scale_colour_viridis_d scale_fill_viridis_d theme_bw xlab ylab ggtitle
 volcano_plot <- function(res,
                          label = "outcome",
                          snp_col = "snp",
@@ -162,6 +166,7 @@ volcano_plot <- function(res,
 #'                     result (\code{FALSE}).
 #'
 #' @return Plot
+#' @importFrom dplyr group_by across all_of mutate arrange
 #' @importFrom ggplot2 ggplot aes geom_point geom_errorbarh geom_vline facet_grid xlab ylab theme_bw theme element_text
 #' @export
 forest_plot <- function(res,

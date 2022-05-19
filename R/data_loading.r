@@ -104,8 +104,8 @@ file_to_gwasvcf <- function(file,
 #' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @return gwasvcf object
-#' @importFrom gwasvcf create_vcf create_rsidx_index_from_vcf
-#' @importFrom VariantAnnotation writeVcf
+#' @importFrom gwasvcf create_vcf create_rsidx_index_from_vcf set_bcftools
+#' @importFrom VariantAnnotation writeVcf indexVcf
 #' @importFrom tools file_path_sans_ext
 #' @importFrom Rsamtools bgzip
 #' @export
@@ -202,7 +202,7 @@ dat_to_gwasvcf <- function(dat,
 
     # Swap over as bcf_tools will not do this in place
     if (file.exists(temp)) {
-      invisible(file.remove(out, showWarnings = F))
+      file.remove(out, showWarnings = F)
       file.rename(temp, out)
     }
   }
@@ -359,9 +359,10 @@ read_outcome <- function(ids,
 #' @return Data.frame of datasets
 #' @importFrom parallel mclapply
 #' @importFrom gwasvcf query_gwas
-#' @importFrom gwasglue gwasvcf_to_TwoSampleMR
-#' @importFrom dplyr mutate
+#' @importFrom gwasglue gwasvcf_to_TwoSampleMR ieugwasr_to_TwoSampleMR
+#' @importFrom dplyr mutate bind_rows
 #' @importFrom ieugwasr tophits associations gwasinfo ld_clump
+#' @importFrom VariantAnnotation readVcf
 .read_dataset <- function(ids,
                           rsids = NULL,
                           pval = 5e-8,
@@ -432,10 +433,10 @@ read_outcome <- function(ids,
       .print_msg(paste0("Reading \"", id, "\" as GWAS VCF file."), verbose)
 
       if (type == "exposure") {
-        dat <- gwasvcf::query_gwas(vcf = VariantAnnotation::readVcf(id),
+        dat <- gwasvcf::query_gwas(vcf = id,
                                    pval = pval)
       } else {
-        dat <- gwasvcf::query_gwas(vcf = VariantAnnotation::readVcf(id),
+        dat <- gwasvcf::query_gwas(vcf = id,
                                    rsid = rsids,
                                    proxies = ifelse(proxies == TRUE, "yes", "no"),
                                    bfile = bfile,
@@ -559,9 +560,9 @@ read_outcome <- function(ids,
   }
 
   attempt <- tryCatch({
-    mart.gene <- useMart(biomart = biomart,
-                         host = host,
-                         dataset = dataset)
+    mart.gene <- biomaRt::useMart(biomart = biomart,
+                                  host = host,
+                                  dataset = dataset)
   }, error = function(e) {
     warning("biomaRt is currently unavailable and so ENSG IDs will not be annotated.")
   })
@@ -570,10 +571,10 @@ read_outcome <- function(ids,
     return(dat)
   }
 
-  results <- getBM(attributes = c("ensembl_gene_id", "hgnc_symbol", "chromosome_name", "start_position", "end_position"),
-                   filters = "ensembl_gene_id",
-                   values = unique(dat[[ensg_col]]),
-                   mart = mart.gene)
+  results <- biomaRt::getBM(attributes = c("ensembl_gene_id", "hgnc_symbol", "chromosome_name", "start_position", "end_position"),
+                            filters = "ensembl_gene_id",
+                            values = unique(dat[[ensg_col]]),
+                            mart = mart.gene)
 
   if (length(results) && nrow(results)) {
     results <- subset(results, select = c(ensembl_gene_id, hgnc_symbol))
@@ -638,7 +639,7 @@ annotate_efo <- function(dat,
 
   lapply(1:nrow(dat), function(i) {
     disease <- iconv(dat[i, column], from = 'UTF-8', to = 'ASCII//TRANSLIT')
-    attempt <- try(r <- ontology_gwas_efo(disease, fuzzy = T, mode = "table"), silent = T)
+    attempt <- try(r <- epigraphdb::ontology_gwas_efo(disease, fuzzy = T, mode = "table"), silent = T)
 
     if (!inherits(attempt, "try-error") && length(r)) {
       efo <- r[r$r.score > 0.95,][1, ]$efo.id
@@ -721,9 +722,9 @@ cis_trans <- function(dat,
   }
 
   attempt <- tryCatch({
-    mart.gene <- useMart(biomart = biomart,
-                         host = host,
-                         dataset = dataset)
+    mart.gene <- biomaRt::useMart(biomart = biomart,
+                                  host = host,
+                                  dataset = dataset)
   }, error = function(e) {
     warning("biomaRt is currently unavailable and so cis/trans status will not be annotated.")
   })
@@ -732,10 +733,10 @@ cis_trans <- function(dat,
     return(dat)
   }
 
-  results <- getBM(attributes = c("ensembl_gene_id", "hgnc_symbol", "chromosome_name", "start_position", "end_position"),
-                   filters = filter,
-                   values = unique(dat[[values_col]]),
-                   mart = mart.gene)
+  results <- biomart::getBM(attributes = c("ensembl_gene_id", "hgnc_symbol", "chromosome_name", "start_position", "end_position"),
+                            filters = filter,
+                            values = unique(dat[[values_col]]),
+                            mart = mart.gene)
 
   if (length(results) && nrow(results)) {
     dat <- base::merge(dat, results, by.x = values_col, by.y = filter, all.x = TRUE, suffixes = c("", ".y"))
@@ -751,10 +752,10 @@ cis_trans <- function(dat,
           )
       )
     } else {
-      snp_res <- getBM(attributes = c("refsnp_id", "chr_name", "chrom_start", "chrom_end"),
-                       filters = "snp_filter",
-                       values = unique(dat[[snp_col]]),
-                       mart = useEnsembl("snp", dataset = "hsapiens_snp", GRCh = grch))
+      snp_res <- biomaRt::getBM(attributes = c("refsnp_id", "chr_name", "chrom_start", "chrom_end"),
+                                filters = "snp_filter",
+                                values = unique(dat[[snp_col]]),
+                                mart = biomaRt::useEnsembl("snp", dataset = "hsapiens_snp", GRCh = grch))
 
       if (length(snp_res) && nrow(snp_res)) {
         dat <- base::merge(dat, snp_res, by.x = snp_col, by.y = refsnp_id, all.x = TRUE, suffixes = c("", ".z"))
@@ -798,7 +799,7 @@ harmonise <- function(exposure,
                       outcome,
                       action = 1)
 {
-  dat <- harmonise_data(exposure, outcome, action = action)
+  dat <- TwoSampleMR::harmonise_data(exposure, outcome, action = action)
 }
 
 #' Helper function to extract colocalisation regions for when one dataset comes
@@ -812,6 +813,9 @@ harmonise <- function(exposure,
 #'
 #' @return list of coloc-ready data
 #' @keywords Internal
+#' @importFrom VariantAnnotation readVcf header meta
+#' @importFrom gwasvcf query_gwas vcf_to_tibble
+#' @importFrom ieugwasr associations gwasinfo
 .cdat_from_mixed <- function(f1, f2,
                              chrpos,
                              verbose = TRUE)

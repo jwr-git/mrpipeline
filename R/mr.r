@@ -14,6 +14,7 @@
 #'
 #' @return Modified `dat` data.frame (if f_cutoff > 0 supplied)
 #' @export
+#' @importFrom plyr ddply
 calc_f_stat <- function(dat, f_cutoff = 10, force_approx = FALSE, verbose = TRUE)
 {
   dat <- plyr::ddply(dat, c("id.exposure"), function(x)
@@ -190,6 +191,8 @@ calc_f_stat <- function(dat, f_cutoff = 10, force_approx = FALSE, verbose = TRUE
 #'
 #' @return A data.frame of MR results
 #' @export
+#' @importFrom plyr ddply
+#' @importFrom TwoSampleMR generate_odds_ratios directionality_test
 do_mr <- function(dat, f_cutoff = 10, all_wr = TRUE, verbose = TRUE)
 {
   if (!is.null(f_cutoff)) {
