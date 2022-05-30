@@ -103,7 +103,15 @@ do_coloc <- function(dat,
       }
 
       if (all(is.na(cdat))) {
-        return(NA)
+        return(list(data.frame = list(file.exposure = f1,
+                                      file.outcome = f2,
+                                      nsnps = NA,
+                                      PP.H0.abf = NA,
+                                      PP.H1.abf = NA,
+                                      PP.H2.abf = NA,
+                                      PP.H3.abf = NA,
+                                      PP.H4.abf = NA),
+                    regional = NA, zscore = NA))
       }
 
       cres <- .coloc_sub(cdat[[1]], cdat[[2]],
@@ -122,18 +130,28 @@ do_coloc <- function(dat,
     if (plot_region) {
       if (length(cdat[[1]]$snp) > 500 && (is.null(plink) || is.null(bfile))) {
         warning("Cannot generate regional plot as the number of SNPs in the region is above 500 and no bfile/Plink arguments have been given.")
-        p <- NA
+        rp <- NA
       } else if (length(cdat[[1]]$snp) <= 500) {
-        p <- regional_plot(cdat, subdat$exposure[1], subdat$outcome[1], verbose = verbose)
+        rp <- regional_plot(cdat, subdat$exposure[1], subdat$outcome[1], verbose = verbose)
       } else {
-        p <- regional_plot(cdat, subdat$exposure[1], subdat$outcome[1], bfile = bfile, plink = plink, verbose = verbose)
+        rp <- regional_plot(cdat, subdat$exposure[1], subdat$outcome[1], bfile = bfile, plink = plink, verbose = verbose)
       }
     } else {
-      p <- NA
+      rp <- NA
     }
 
+    zp <- z_comparison_plot(cdat[[1]], cdat[[2]], verbose = verbose)
+
     if (all(is.na(cres))) {
-      return(NA)
+      return(list(data.frame = list(file.exposure = f1,
+                                    file.outcome = f2,
+                                    nsnps = NA,
+                                    PP.H0.abf = NA,
+                                    PP.H1.abf = NA,
+                                    PP.H2.abf = NA,
+                                    PP.H3.abf = NA,
+                                    PP.H4.abf = NA),
+                  regional = NA, zscore = NA))
     }
 
     if (length(cres)) {
@@ -145,7 +163,7 @@ do_coloc <- function(dat,
 
     ret_cres <- as.data.frame(split(unname(cres), names(cres)))
 
-    return(list(data.frame = ret_cres, plot = p))
+    return(list(data.frame = ret_cres, regional = rp, zscore = zp))
   }, mc.cores = cores) %>%
     `c`(.)
 
@@ -171,9 +189,10 @@ do_coloc <- function(dat,
   #rownames(coloc.df) <- NULL
   #coloc.df[, 3:8] <- sapply(coloc.df[, 3:8], as.numeric)
 
-  coloc.plots <- sapply(coloc_res[which(!is.na(sapply(coloc_res, '[[', 1)))], '[[', 2)
+  regional.plots <- sapply(coloc_res, function(x) { x$regional })
+  zscore.plots <- sapply(coloc_res, function(x) { x$zscore })
 
-  return(list(res = coloc.df, plots = coloc.plots))
+  return(list(res = coloc.df, regional = regional.plots, zscore = zscore.plots))
 }
 
 #' Sub-function for the colocalisation analyses

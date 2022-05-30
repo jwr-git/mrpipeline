@@ -63,6 +63,51 @@ z_plot <- function(dat,
   return(p)
 }
 
+#' Z score comparison plot
+#'
+#' If `plotly` is installed, the plot will be returned interactive.
+#'
+#' @param dat1 A list of data
+#' @param dat2 A list of data
+#' @param z_col Column name for Z scores (Optional)
+#' @param force_static True for forcing the plot to be returned as a static plot (Optional)
+#' @param verbose Display verbose information (Optional, boolean)
+#'
+#' @return Plot
+#' @export
+#' @importFrom plotly highlight_key plot_ly
+#' @importFrom ggplot2 ggplot aes geom_point scale_colour_steps theme_bw xlab ylab labs ggtitle
+z_comparison_plot <- function(dat1,
+                              dat2,
+                              z_col = "z",
+                              p_col = "pvalues",
+                              verbose = TRUE)
+{
+  if (length(dat1) < 1 || length(dat2) < 1)
+  {
+    warning("\"res\" is empty or lacks data. Please check before continuing.")
+    return(NA)
+  }
+
+  dat <- data.frame(x = dat1[[z_col]], y = dat2[[z_col]],
+                    px = dat1[[p_col]], py = dat2[[p_col]])
+
+
+  p <- ggplot2::ggplot(data = dat,
+                       ggplot2::aes(x = x, y = y)) +
+    ggplot2::geom_point(size = 2, alpha = 0.4, ggplot2::aes(colour = px)) +
+    ggplot2::geom_vline(xintercept = 0) +
+    ggplot2::geom_hline(yintercept = 0) +
+    ggplot2::theme_bw() +
+    ggplot2::scale_colour_steps(trans = "log") +
+    ggplot2::xlab(dat1$id) +
+    ggplot2::ylab(dat2$id) +
+    ggplot2::labs(colour = "P value") +
+    ggplot2::ggtitle("Plot comparing Z scores between datasets")
+
+  return(p)
+}
+
 #' Volcano plot
 #'
 #' Creates a volcano plot of Wald ratios from [do_mr()].
