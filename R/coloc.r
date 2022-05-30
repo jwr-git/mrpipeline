@@ -13,6 +13,7 @@
 #' @param dat A data.frame of harmonised data
 #' @param method Which method of colocalisation to use: coloc.abf, coloc.susie, pwcoco (Optional)
 #' @param coloc_window Size (+/-) of region to extract for colocalisation analyses (Optional)
+#' @param plot_region Whether to plot the regions or not
 #' @param bfile Path to Plink bed/bim/fam files (Optional)
 #' @param plink Path to Plink binary (Optional)
 #' @param pwcoco If PWCoCo is the selected coloc method, path to PWCoCo binary (Optional)
@@ -30,6 +31,7 @@
 do_coloc <- function(dat,
                      method = "coloc.abf",
                      coloc_window = 500000,
+                     plot_region = F,
                      bfile = NULL,
                      plink = NULL,
                      pwcoco = NULL,
@@ -117,13 +119,17 @@ do_coloc <- function(dat,
       cres <- .pwcoco_sub(chrpos, bfile, pwcoco, workdir)
     }
 
-    if (length(cdat[[1]]$snp) > 500 && (is.null(plink) || is.null(bfile))) {
-      warning("Cannot generate regional plot as the number of SNPs in the region is above 500 and no bfile/Plink arguments have been given.")
-      p <- NA
-    } else if (length(cdat[[1]]$snp) <= 500) {
-      p <- regional_plot(cdat, subdat$exposure[1], subdat$outcome[1], verbose = verbose)
+    if (plot_region) {
+      if (length(cdat[[1]]$snp) > 500 && (is.null(plink) || is.null(bfile))) {
+        warning("Cannot generate regional plot as the number of SNPs in the region is above 500 and no bfile/Plink arguments have been given.")
+        p <- NA
+      } else if (length(cdat[[1]]$snp) <= 500) {
+        p <- regional_plot(cdat, subdat$exposure[1], subdat$outcome[1], verbose = verbose)
+      } else {
+        p <- regional_plot(cdat, subdat$exposure[1], subdat$outcome[1], bfile = bfile, plink = plink, verbose = verbose)
+      }
     } else {
-      p <- regional_plot(cdat, subdat$exposure[1], subdat$outcome[1], bfile = bfile, plink = plink, verbose = verbose)
+      p <- NA
     }
 
     if (all(is.na(cres))) {

@@ -8,6 +8,7 @@ do_coloc(
   dat,
   method = "coloc.abf",
   coloc_window = 5e+05,
+  plot_region = F,
   bfile = NULL,
   plink = NULL,
   pwcoco = NULL,
@@ -22,6 +23,8 @@ do_coloc(
 \item{method}{Which method of colocalisation to use: coloc.abf, coloc.susie, pwcoco (Optional)}
 
 \item{coloc_window}{Size (+/-) of region to extract for colocalisation analyses (Optional)}
+
+\item{plot_region}{Whether to plot the regions or not}
 
 \item{bfile}{Path to Plink bed/bim/fam files (Optional)}
 
