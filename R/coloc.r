@@ -1,3 +1,88 @@
+#' Extract SNPs based on region for colocalisation analyses.
+#' Can be used before calling the `do_coloc` function or will be called as part
+#' of that function automatically.
+#'
+#' @seealso [mrpipeline::do_coloc()]
+#'
+#' @param dat A data.frame of harmonised data
+#' @param window Window around SNPs to extract (Optional)
+#' @param cores Number of cores for multi-threaded tasks (Optional)
+#'              NB: Unavailable on Windows machines
+#' @param verbose Display verbose information (Optional, boolean)
+#'
+#' @return Named list of matched regional data
+#' @export
+#' @importFrom tidyr crossing
+#' @importFrom parallel mclapply
+extract_matched_regions <- function(dat,
+                                    window = 500000,
+                                    cores = 1,
+                                    verbose = TRUE)
+{
+  if (!all(c("file.exposure", "file.outcome") %in% names(dat))) {
+    warning("Requires harmonised dataset for colocalisation; \"file.exposure\" and \"file.outcome\" columns not found.")
+    return(NULL)
+  }
+
+  # Each unique pair of traits need to be colocalised
+  pairs <- tidyr::crossing(dat$file.exposure, dat$file.outcome)
+  names(pairs) <- c("file.exposure", "file.outcome")
+
+  coloc_dat <- parallel::mclapply(1:nrow(pairs), function(i)
+  {
+    subdat <- dat[which(dat$file.exposure == pairs[i, "file.exposure"][[1]] & dat$file.outcome == pairs[i, "file.outcome"][[1]]), ]
+
+    if (length(subdat) < 1 || nrow(subdat) < 1) {
+      return(NULL)
+    }
+
+    if ("pos.exposure" %in% names(subdat)) {
+      pos_var <- "pos.exposure"
+    } else if ("position.exposure" %in% names(subdat)) {
+      pos_var <- "position.exposure"
+    } else {
+      pos_var <- "bp.exposure"
+    }
+
+    # Select region for which to do coloc
+    # atm very simply the lowest P-value region
+    idx <- which.min(subdat$pval.exposure)
+    chrpos <- paste0(as.character(subdat$chr.exposure[idx]),
+                     ":",
+                     max(as.numeric(subdat[idx, pos_var]) - window, 0),
+                     "-",
+                     as.numeric(subdat[idx, pos_var]) + window)
+
+    f1 <- pairs[i, "file.exposure"][[1]]
+    f2 <- pairs[i, "file.outcome"][[1]]
+
+    if (file.exists(f1) && file.exists(f2))
+    {
+      cdat <- .gwasvcf_to_coloc_rsid(f1, f2, chrpos)
+    } else if (!file.exists(f1) && !file.exists(f2))
+    {
+      cdat <- gwasglue::ieugwasr_to_coloc(f1, f2, chrpos)
+    } else {
+      # One is file, one is not
+      cdat <- .cdat_from_mixed(f1, f2, chrpos, verbose)
+    }
+
+    if (all(is.na(cdat))) {
+      return(NULL)
+    }
+
+    return(list(
+      id.exposure = subdat$id.exposure[1],
+      id.outcome = subdat$id.outcome[1],
+      file.exposure = subdat$file.exposure[1],
+      file.outcome = subdat$file.outcome[1],
+      dat.exposure = cdat$dataset1,
+      dat.outcome = cdat$dataset2
+    ))
+  }, mc.cores = cores) %>%
+    `c`(.)
+}
+
 #' Run colocalisation analyses
 #'
 #' Runs colocalisation using any of the following methods:
@@ -11,6 +96,7 @@
 #' @seealso [coloc::coloc.abf()], [coloc::coloc.susie()]
 #'
 #' @param dat A data.frame of harmonised data
+#' @param cdat A named list of regional data but can be omitted (Optional)
 #' @param method Which method of colocalisation to use: coloc.abf, coloc.susie, pwcoco (Optional)
 #' @param coloc_window Size (+/-) of region to extract for colocalisation analyses (Optional)
 #' @param plot_region Whether to plot the regions or not
@@ -29,6 +115,7 @@
 #' @importFrom gwasglue ieugwasr_to_coloc
 #' @importFrom tibble tibble
 do_coloc <- function(dat,
+                     cdat = NA,
                      method = "coloc.abf",
                      coloc_window = 500000,
                      plot_region = F,
@@ -66,55 +153,41 @@ do_coloc <- function(dat,
   {
     subdat <- dat[which(dat$file.exposure == pairs[i, "file.exposure"][[1]] & dat$file.outcome == pairs[i, "file.outcome"][[1]]), ]
 
-    if (length(subdat) < 1 || nrow(subdat) < 1) {
-      return(NULL)
-    }
-
-    if ("pos.exposure" %in% names(subdat)) {
-      pos_var <- "pos.exposure"
-    } else if ("position.exposure" %in% names(subdat)) {
-      pos_var <- "position.exposure"
-    } else {
-      pos_var <- "bp.exposure"
-    }
-
-    # Select region for which to do coloc
-    # atm very simply the lowest P-value region
-    idx <- which.min(subdat$pval.exposure)
-    chrpos <- paste0(as.character(subdat$chr.exposure[idx]),
-                     ":",
-                     max(as.numeric(subdat[idx, pos_var]) - coloc_window, 0),
-                     "-",
-                     as.numeric(subdat[idx, pos_var]) + coloc_window)
-
     f1 <- pairs[i, "file.exposure"][[1]]
     f2 <- pairs[i, "file.outcome"][[1]]
 
     if (method == "coloc.abf" || method == "coloc.susie") {
-      if (file.exists(f1) && file.exists(f2))
-      {
-        cdat <- .gwasvcf_to_coloc_rsid(f1, f2, chrpos)
-      } else if (!file.exists(f1) && !file.exists(f2))
-      {
-        cdat <- gwasglue::ieugwasr_to_coloc(f1, f2, chrpos)
-      } else {
-        # One is file, one is not
-        cdat <- .cdat_from_mixed(f1, f2, chrpos, verbose)
+      idx <- 0
+      mdat <- NA
+      if (any(!is.na(cdat))) {
+        idx <- which(
+          sapply(cdat, function(x) {
+            x$file.exposure == pairs[i, "file.exposure"] & x$file.outcome == pairs[i, "file.outcome"]
+          }
+          ) == 1)
       }
 
-      if (all(is.na(cdat))) {
-        return(list(data.frame = list(file.exposure = f1,
-                                      file.outcome = f2,
-                                      nsnps = NA,
-                                      PP.H0.abf = NA,
-                                      PP.H1.abf = NA,
-                                      PP.H2.abf = NA,
-                                      PP.H3.abf = NA,
-                                      PP.H4.abf = NA),
-                    regional = NA, zscore = NA))
+      if (!is.na(idx) && idx > 0) {
+        mdat <- cdat[[idx]]
       }
 
-      cres <- .coloc_sub(cdat[[1]], cdat[[2]],
+      # Fall-back, attempt to extract data here ourselves
+      if (all(is.na(mdat)) || all(is.na(cdat))) {
+        mdat <- extract_matched_regions(subdat, window = coloc_window)[[1]]
+      }
+
+      if (all(is.na(mdat))) {
+        return(data.frame(file.exposure = f1,
+                          file.outcome = f2,
+                          nsnps = NA,
+                          PP.H0.abf = NA,
+                          PP.H1.abf = NA,
+                          PP.H2.abf = NA,
+                          PP.H3.abf = NA,
+                          PP.H4.abf = NA))
+      }
+
+      cres <- .coloc_sub(mdat$dat.exposure, mdat$dat.outcome,
                          susie = ifelse(method == "coloc.abf", FALSE, TRUE),
                          verbose = verbose)
     } else if (method == "pwcoco") {
@@ -127,31 +200,15 @@ do_coloc <- function(dat,
       cres <- .pwcoco_sub(chrpos, bfile, pwcoco, workdir)
     }
 
-    if (plot_region) {
-      if (length(cdat[[1]]$snp) > 500 && (is.null(plink) || is.null(bfile))) {
-        warning("Cannot generate regional plot as the number of SNPs in the region is above 500 and no bfile/Plink arguments have been given.")
-        rp <- NA
-      } else if (length(cdat[[1]]$snp) <= 500) {
-        rp <- regional_plot(cdat, subdat$exposure[1], subdat$outcome[1], verbose = verbose)
-      } else {
-        rp <- regional_plot(cdat, subdat$exposure[1], subdat$outcome[1], bfile = bfile, plink = plink, verbose = verbose)
-      }
-    } else {
-      rp <- NA
-    }
-
-    zp <- z_comparison_plot(cdat[[1]], cdat[[2]], verbose = verbose)
-
     if (all(is.na(cres))) {
-      return(list(data.frame = list(file.exposure = f1,
-                                    file.outcome = f2,
-                                    nsnps = NA,
-                                    PP.H0.abf = NA,
-                                    PP.H1.abf = NA,
-                                    PP.H2.abf = NA,
-                                    PP.H3.abf = NA,
-                                    PP.H4.abf = NA),
-                  regional = NA, zscore = NA))
+      return(list(file.exposure = f1,
+                  file.outcome = f2,
+                  nsnps = NA,
+                  PP.H0.abf = NA,
+                  PP.H1.abf = NA,
+                  PP.H2.abf = NA,
+                  PP.H3.abf = NA,
+                  PP.H4.abf = NA))
     }
 
     if (length(cres)) {
@@ -163,36 +220,11 @@ do_coloc <- function(dat,
 
     ret_cres <- as.data.frame(split(unname(cres), names(cres)))
 
-    return(list(data.frame = ret_cres, regional = rp, zscore = zp))
+    return(ret_cres)
   }, mc.cores = cores) %>%
-    `c`(.)
+    dplyr::bind_rows()
 
-  # This is not vectorised but could be!
-  coloc.df <- tibble::tibble(file.exposure = character(),
-                             file.outcome = character(),
-                             nsnps = character(),
-                             PP.H0.abf = character(),
-                             PP.H1.abf = character(),
-                             PP.H2.abf = character(),
-                             PP.H3.abf = character(),
-                             PP.H4.abf = character())
-  for (i in 1:length(coloc_res)) {
-    if (all(is.na(coloc_res[[i]]))) {
-      next
-    }
-    coloc.df <- rbind(coloc.df, coloc_res[[i]]$data.frame)
-  }
-
-  # This vectorised version is iffy
-  #coloc.df <- t(as.data.frame(sapply(coloc_res[which(!is.na(sapply(coloc_res, '[[', 1)))], '[[', 1)))
-  #coloc.df <- as.data.frame(coloc.df)
-  #rownames(coloc.df) <- NULL
-  #coloc.df[, 3:8] <- sapply(coloc.df[, 3:8], as.numeric)
-
-  regional.plots <- sapply(coloc_res, function(x) { x$regional })
-  zscore.plots <- sapply(coloc_res, function(x) { x$zscore })
-
-  return(list(res = coloc.df, regional = regional.plots, zscore = zscore.plots))
+  return(coloc_res)
 }
 
 #' Sub-function for the colocalisation analyses

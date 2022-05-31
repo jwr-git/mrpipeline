@@ -6,6 +6,7 @@
 \usage{
 do_coloc(
   dat,
+  cdat = NA,
   method = "coloc.abf",
   coloc_window = 5e+05,
   plot_region = F,
@@ -19,6 +20,8 @@ do_coloc(
 }
 \arguments{
 \item{dat}{A data.frame of harmonised data}
+
+\item{cdat}{A named list of regional data but can be omitted (Optional)}
 
 \item{method}{Which method of colocalisation to use: coloc.abf, coloc.susie, pwcoco (Optional)}
 
