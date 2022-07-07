@@ -4,7 +4,7 @@
 \alias{harmonise}
 \title{Harmonise exposure and outcomes.}
 \usage{
-harmonise(exposure, outcome, action = 1)
+harmonise(exposure, outcome, action = 1, cores = 1)
 }
 \arguments{
 \item{exposure}{Data.frame of exposure dataset(s)}
@@ -12,6 +12,9 @@ harmonise(exposure, outcome, action = 1)
 \item{outcome}{Data.frame of outcome dataset(s)}
 
 \item{action}{How to harmonise alleles; see \link[TwoSampleMR]{harmonise_data}.}
+
+\item{cores}{Number of cores for multi-threaded tasks (Optional)
+NB: Unavailable on Windows machines}
 }
 \value{
 Harmonised data.frame

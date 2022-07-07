@@ -791,15 +791,29 @@ cis_trans <- function(dat,
 #' @param exposure Data.frame of exposure dataset(s)
 #' @param outcome Data.frame of outcome dataset(s)
 #' @param action How to harmonise alleles; see \link[TwoSampleMR]{harmonise_data}.
+#' @param cores Number of cores for multi-threaded tasks (Optional)
+#'              NB: Unavailable on Windows machines
 #'
 #' @return Harmonised data.frame
 #' @importFrom TwoSampleMR harmonise_data
+#' @importFrom tidyr crossing
+#' @importFrom parallel mclapply
 #' @export
 harmonise <- function(exposure,
                       outcome,
-                      action = 1)
+                      action = 1,
+                      cores = 1)
 {
-  dat <- TwoSampleMR::harmonise_data(exposure, outcome, action = action)
+  pairs <- tidyr::crossing(exposure$id.exposure, outcome$id.outcome)
+  names(pairs) <- c("id.exposure", "id.outcome")
+  dat <- parallel::mclapply(1:nrow(pairs), function(i)
+  {
+    TwoSampleMR::harmonise_data(
+      exposure[exposure$id.exposure == pairs[i, "id.exposure"], ],
+      outcome[outcome$id.outcome == pairs[i, "id.outcome"], ],
+      action = action
+    )
+  }, mc.cores = cores)
 }
 
 #' Helper function to extract colocalisation regions for when one dataset comes
