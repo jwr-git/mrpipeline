@@ -33,8 +33,8 @@ harmonise <- function(exposure,
   names(pairs) <- c("id.exposure", "id.outcome")
   dat <- parallel::mclapply(1:nrow(pairs), function(i)
   {
-    exp <- exposure[exposure$id.exposure == pairs[i, "id.exposure"], ]
-    out <- outcome[outcome$id.outcome == pairs[i, "id.outcome"], ]
+    exp <- exposure[exposure$id.exposure == pairs[i, "id.exposure"][[1]], ]
+    out <- outcome[outcome$id.outcome == pairs[i, "id.outcome"][[1]], ]
 
     TwoSampleMR::harmonise_data(exp, out, action = action)
   }, mc.cores = cores) %>%
