@@ -36,7 +36,13 @@ harmonise <- function(exposure,
     exp <- exposure[exposure$id.exposure == pairs[i, "id.exposure"][[1]], ]
     out <- outcome[outcome$id.outcome == pairs[i, "id.outcome"][[1]], ]
 
-    TwoSampleMR::harmonise_data(exp, out, action = action)
+    harmonised <- TwoSampleMR::harmonise_data(exp, out, action = action)
+
+    if (!nrow(harmonised) | all(is.na(harmonised))) {
+      return(NULL)
+    }
+
+    return(harmonised)
   }, mc.cores = cores) %>%
     dplyr::bind_rows()
 }
