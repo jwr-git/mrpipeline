@@ -108,7 +108,7 @@ pairwise_analysis <- function(exposure,
   if (!dir.exists(res_path)) {
     stop("Pathway does not exist: \"", res_path, "\".")
   }
-  pairs <- tidyr::crossing(exposure$id.exposure, outcomes$id.outcome)
+  pairs <- tidyr::crossing(exposure$id.exposure, outcome$id.outcome)
   names(pairs) <- c("id.exposure", "id.outcome")
   parallel::mclapply(1:nrow(pairs), function(i)
   {

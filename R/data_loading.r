@@ -929,3 +929,87 @@ cis_trans <- function(dat,
 
   return(list(dataset1 = out1, dataset2 = out2))
 }
+
+#' Get column names from agnostic but formatted data.frame
+#'
+#' @param df Data.frame of formatted data (exposure or outcome)
+#' @param data Name of column to find
+#' @param type Type of data (exposure or outcome); NA to check automatically
+#'
+#' @keywords Internal
+#' @return Name of column formatted for given data.frame
+get_col_name <- function(df, data, type = NA)
+{
+  if (is.na(type)) {
+    name <- ifelse(
+      "exposure" %in% names(df),
+      paste0(data, ".exposure"),
+      paste0(data, ".outcome")
+    )
+  } else {
+    name <- paste0(data, ".", type)
+  }
+
+  if (!name %in% names(df))
+  {
+    stop("Could not find column for \"", data, "\" in given data.")
+  }
+
+  return(name)
+}
+
+#' Check if SNPs are good for use in analyses and mark them as such.
+#'
+#' @param dat A data.frame of formatted data (exposure or outcome)
+#' @param analyses Which analyses should be checked?
+#' @param drop Whether to drop SNPs if they failed the check
+#'
+#' @details List of analyses and what data are checked for:
+#' \itemize{
+#'  \item{"MR"}{beta, SE, P value}
+#'  \item{"coloc"}{chromosome, position, P value}
+#' }
+#'
+#' @return Data.frame
+#' @export
+check_snps <- function(dat,
+                       analyses = c("mr", "coloc"),
+                       drop = T)
+{
+  if (length(dat) == 0 || nrow(dat) < 1) {
+    stop("No data were given.")
+  }
+
+  if (length(analyses) == 0) {
+    warning("No analyses given to check!")
+    return(dat)
+  }
+
+  dat$include <- T
+  # MR needs: beta, se, P
+  # MR nice to have: eaf, alleles
+  # Coloc needs: chr, pos, P
+  if ("mr" %in% analyses || "coloc" %in% analyses)
+  {
+    dat[is.na(dat[[get_col_name(dat, "pval")]]), "include"] <- F
+  }
+
+  if ("mr" %in% analyses || "fstat" %in% analyses)
+  {
+    dat[is.na(dat[[get_col_name(dat, "beta")]]), "include"] <- F
+    dat[is.na(dat[[get_col_name(dat, "se")]]), "include"] <- F
+  }
+
+  if ("coloc" %in% analyses)
+  {
+    dat[is.na(dat[[get_col_name(dat, "chr")]]), "include"] <- F
+    dat[is.na(dat[[get_col_name(dat, "pos")]]), "include"] <- F
+  }
+
+  if (drop)
+  {
+    dat <- dat[dat$include, ]
+  }
+
+  return(dat)
+}

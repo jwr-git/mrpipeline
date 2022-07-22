@@ -195,6 +195,8 @@ calc_f_stat <- function(dat, f_cutoff = 10, force_approx = FALSE, verbose = TRUE
 #' @importFrom TwoSampleMR generate_odds_ratios directionality_test
 do_mr <- function(dat, f_cutoff = 10, all_wr = TRUE, verbose = TRUE)
 {
+  check_snps(dat, analyses = "mr")
+
   if (!is.null(f_cutoff)) {
     if ("f.stat.exposure" %in% names(dat)) {
       dat <- dat[dat$f.stat.exposure >= f_cutoff & !is.na(dat$f.stat.exposure), ]
