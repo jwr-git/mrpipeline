@@ -15,6 +15,8 @@ harmonise(exposure, outcome, action = 1, cores = 1, verbose = TRUE)
 
 \item{cores}{Number of cores for multi-threaded tasks (Optional)
 NB: Unavailable on Windows machines}
+
+\item{verbose}{Display verbose information (Optional, boolean)}
 }
 \value{
 Harmonised data.frame
