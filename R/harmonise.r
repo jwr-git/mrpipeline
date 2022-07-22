@@ -100,10 +100,13 @@ is_ambiguous <- function(freq, tol = 0.08)
 pairwise_analysis <- function(exposure,
                               outcome,
                               res_path,
-                              ...,
+                              action = 1,
+                              f_cutoff = 10,
+                              all_wr = TRUE,
                               do_coloc = FALSE,
                               cores = 1,
-                              verbose = TRUE)
+                              verbose = TRUE,
+                              ...)
 {
   if (!dir.exists(res_path)) {
     stop("Pathway does not exist: \"", res_path, "\".")
@@ -115,9 +118,9 @@ pairwise_analysis <- function(exposure,
     exp <- exposure[exposure$id.exposure == pairs[i, "id.exposure"][[1]], ]
     out <- outcome[outcome$id.outcome == pairs[i, "id.outcome"][[1]], ]
 
-    dat <- harmonise(exp, out, ..., cores, verbose)
+    dat <- harmonise(exp, out, action = action, cores = cores, verbose = verbose)
 
-    mr_res <- do_mr(dat, ..., verbose = verbose)
+    mr_res <- do_mr(dat, f_cutoff = f_cutoff, all_wr = all_wr, verbose = verbose)
     write.table(mr_res,
                 file = paste0(res_path,
                               "/",
@@ -129,7 +132,7 @@ pairwise_analysis <- function(exposure,
 
     if (do_coloc)
     {
-      coloc_res <- do_coloc(dat, ..., cores = cores, verbose = verbose)
+      coloc_res <- do_coloc(dat, ..., cores = cores, verbose = verbose) # TODO remove ...
       write.table(coloc_res,
                   file = paste0(res_path,
                                 "/",
