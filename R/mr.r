@@ -254,16 +254,30 @@ do_mr <- function(dat, f_cutoff = 10, all_wr = TRUE, verbose = TRUE)
   # Steiger
   if (any(is.na(dat$samplesize.exposure)) || any(is.na(dat$samplesize.outcome))) {
     warning("Samplesizes are required for Steiger filtering.")
+    res$snp_r2.exposure <- NA
+    res$snp_r2.outcome <- NA
+    res$correct_causal_direction <- NA
+    res$steiger_pval <- NA
     res$steigerflag <- NA
   } else {
     steigerres <- TwoSampleMR::directionality_test(dat)
-    steigerres$steigerflag <- ifelse(steigerres$correct_causal_direction == T & steigerres$steiger_pval < 0.05,
-                                     "True",
-                                     ifelse(steigerres$correct_causal_direction == F & steigerres$steiger_pval < 0.05,
-                                            "False",
-                                            "Unknown"))
 
-    res <- base::merge(res, steigerres, by = c("exposure", "outcome", "id.exposure", "id.outcome"), all.x = TRUE)
+    if (is.null(steigerres)) {
+      res$snp_r2.exposure <- NA
+      res$snp_r2.outcome <- NA
+      res$correct_causal_direction <- NA
+      res$steiger_pval <- NA
+      res$steigerflag <- NA
+    }
+    else {
+      steigerres$steigerflag <- ifelse(steigerres$correct_causal_direction == T & steigerres$steiger_pval < 0.05,
+                                       "True",
+                                       ifelse(steigerres$correct_causal_direction == F & steigerres$steiger_pval < 0.05,
+                                              "False",
+                                              "Unknown"))
+
+      res <- base::merge(res, steigerres, by = c("exposure", "outcome", "id.exposure", "id.outcome"), all.x = TRUE)
+    }
   }
 
   return(res)
