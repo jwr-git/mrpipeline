@@ -118,9 +118,24 @@ pairwise_analysis <- function(exposure,
     exp <- exposure[exposure$id.exposure == pairs[i, "id.exposure"][[1]], ]
     out <- outcome[outcome$id.outcome == pairs[i, "id.outcome"][[1]], ]
 
+    exp <- check_snps(exp, analyses = "mr")
+    out <- check_snps(out, analyses = "mr")
+
+    if (nrow(exp) == 0 || nrow(out) == 0 || length(exp) == 0 || length(out) == 0)
+    {
+      return(NULL)
+    }
+
     dat <- harmonise(exp, out, action = action, cores = cores, verbose = verbose)
 
+    if (nrow(dat) == 0 || length(dat) == 0) {
+      return(NULL)
+    }
+
     mr_res <- do_mr(dat, f_cutoff = f_cutoff, all_wr = all_wr, verbose = verbose)
+    if (is.na(mr_res)) {
+      return(NULL)
+    }
     write.table(mr_res,
                 file = paste0(res_path,
                               "/",

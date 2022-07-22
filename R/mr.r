@@ -195,8 +195,6 @@ calc_f_stat <- function(dat, f_cutoff = 10, force_approx = FALSE, verbose = TRUE
 #' @importFrom TwoSampleMR generate_odds_ratios directionality_test
 do_mr <- function(dat, f_cutoff = 10, all_wr = TRUE, verbose = TRUE)
 {
-  check_snps(dat, analyses = "mr")
-
   if (!is.null(f_cutoff)) {
     if ("f.stat.exposure" %in% names(dat)) {
       dat <- dat[dat$f.stat.exposure >= f_cutoff & !is.na(dat$f.stat.exposure), ]
@@ -204,6 +202,10 @@ do_mr <- function(dat, f_cutoff = 10, all_wr = TRUE, verbose = TRUE)
       .print_msg("F-statistic cut-off given but could not find column \"f.stat.exposure\". Calculating these now.", verbose = verbose)
       dat <- calc_f_stat(dat, f_cutoff = f_cutoff, verbose = verbose)
     }
+  }
+
+  if (!nrow(dat) || !length(dat)) {
+    return(NA)
   }
 
   res <- plyr::ddply(dat, c("id.exposure", "id.outcome"), function(x1)
