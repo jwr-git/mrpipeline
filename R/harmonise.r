@@ -126,36 +126,42 @@ pairwise_analysis <- function(exposure,
       return(NULL)
     }
 
-    dat <- harmonise(exp, out, action = action, cores = cores, verbose = verbose)
+    exp_name <- basename(tools::file_path_sans_ext(pairs[i, "id.exposure"][[1]]))
+    out_name <- basename(tools::file_path_sans_ext(pairs[i, "id.outcome"][[1]]))
 
-    if (nrow(dat) == 0 || length(dat) == 0) {
-      return(NULL)
-    }
+    mr_file_name <- paste0(res_path,
+                           "/",
+                           exp_name,
+                           "_",
+                           out_name,
+                           "_mr_results.txt")
 
-    mr_res <- do_mr(dat, f_cutoff = f_cutoff, all_wr = all_wr, verbose = verbose)
-    if (is.na(mr_res)) {
-      return(NULL)
-    }
-    write.table(mr_res,
-                file = paste0(res_path,
-                              "/",
-                              pairs[i, "id.exposure"][[1]],
-                              "_",
-                              pairs[i, "id.outcome"][[1]],
-                              "_mr_results.txt"),
-                ...)
-
-    if (do_coloc)
+    if (!file.exists(mr_file_name))
     {
-      coloc_res <- do_coloc(dat, ..., cores = cores, verbose = verbose) # TODO remove ...
-      write.table(coloc_res,
-                  file = paste0(res_path,
-                                "/",
-                                pairs[i, "id.exposure"][[1]],
-                                "_",
-                                pairs[i, "id.outcome"][[1]],
-                                "_coloc_results.txt"),
-                  ...)
+      dat <- harmonise(exp, out, action = action, cores = cores, verbose = verbose)
+
+      if (nrow(dat) == 0 || length(dat) == 0) {
+        return(NULL)
+      }
+
+      mr_res <- do_mr(dat, f_cutoff = f_cutoff, all_wr = all_wr, verbose = verbose)
+      if (is.na(mr_res)) {
+        return(NULL)
+      }
+      write.table(mr_res, file = mr_file_name, ...)
+    }
+
+    coloc_file_name <- paste0(res_path,
+                              "/",
+                              exp_name,
+                              "_",
+                              out_name,
+                              "_coloc_results.txt")
+
+    if (do_coloc && !file.exists(coloc_file_name))
+    {
+      coloc_res <- do_coloc(dat, ..., cores = cores, verbose = verbose) # TODO remove `...`
+      write.table(coloc_res, file = coloc_file_name, ...)
     }
 
   }, mc.cores = cores)
