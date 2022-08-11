@@ -248,10 +248,20 @@ do_mr <- function(dat, f_cutoff = 10, all_wr = TRUE, verbose = TRUE)
     }
 
     if (nrow(res) > 0) {
-      res <- subset(res, !(is.na(b) & is.na(se) & is.na(pval)))
+      res <- subset(res, !(is.na(b) & is.na(se) & is.na(pval))) %>%
+        TwoSampleMR::generate_odds_ratios()
     }
-  }) %>%
-    TwoSampleMR::generate_odds_ratios()
+  })
+
+  # MR-Egger interceptt
+  egger_intercept_res <- TwoSampleMR::mr_pleiotropy_test(dat)
+  if (nrow(egger_intercept_res) > 1) {
+    res <- base::merge(res, egger_intercept_res, by = c("exposure", "outcome", "id.exposure", "id.outcome"), suffixes = c("", ".egger"))
+  } else {
+    res$egger_intercept <- NA
+    res$se.egger <- NA
+    res$pval.egger <- NA
+  }
 
   # Steiger
   if (any(is.na(dat$samplesize.exposure)) || any(is.na(dat$samplesize.outcome))) {

@@ -84,6 +84,7 @@ is_ambiguous <- function(freq, tol = 0.08)
 #' @param exposure Data.frame of exposure dataset(s)
 #' @param outcome Data.frame of outcome dataset(s)
 #' @param res_path Path to save result files
+#' @param overwrite If the results file exists, should it be overwritten?
 #' @param ... Other arguments for the following functions:
 #'            \link[mrpipeline]{harmonise}
 #'            \link[mrpipeline]{do_mr}
@@ -100,6 +101,7 @@ is_ambiguous <- function(freq, tol = 0.08)
 pairwise_analysis <- function(exposure,
                               outcome,
                               res_path,
+                              overwrite = F,
                               action = 1,
                               f_cutoff = 10,
                               all_wr = TRUE,
@@ -136,7 +138,7 @@ pairwise_analysis <- function(exposure,
                            out_name,
                            "_mr_results.txt")
 
-    if (!file.exists(mr_file_name))
+    if (!file.exists(mr_file_name) || overwrite)
     {
       dat <- harmonise(exp, out, action = action, cores = cores, verbose = verbose)
 
@@ -158,7 +160,7 @@ pairwise_analysis <- function(exposure,
                               out_name,
                               "_coloc_results.txt")
 
-    if (do_coloc && !file.exists(coloc_file_name))
+    if (do_coloc && (!file.exists(coloc_file_name) || overwrite))
     {
       coloc_res <- do_coloc(dat, ..., cores = cores, verbose = verbose) # TODO remove `...`
       write.table(coloc_res, file = coloc_file_name, ...)
