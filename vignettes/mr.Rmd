@@ -62,7 +62,8 @@ The `do_mr` function conducts the following analyses in this order:
     * The WR method herein uses the second-term Taylor series expansion for the approximation of the standard error (more information on this, including the derivation, can be found in [this paper](https://doi.org/10.1101/2021.03.01.433439), supplementary).
     
 1. The inverse variance weighted (IVW) method is used for multi-SNP instruments.
-    * This method uses the delta method as detailed in the `MendelianRandomization` package (see: https://rdrr.io/cran/MendelianRandomization/man/mr_ivw.html). 
+    * This method uses the delta method as detailed in the `MendelianRandomization` package (see: https://rdrr.io/cran/MendelianRandomization/man/mr_ivw.html).
+    * The Egger intercept term is also generated for multi-SNP instruments.
     
 1. Finally, if sample sizes are present for both exposure and outcome datasets, then a test for directionality (Steiger filtering) will be conducted. The pipeline directly calls the TwoSampleMR package for this analysis, so we advise reading those [vignettes](https://mrcieu.github.io/TwoSampleMR/articles/perform_mr.html#mr-steiger-directionality-test-1).
 

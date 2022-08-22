@@ -31,13 +31,15 @@ The pipeline makes specific use of the "gwasvcf" format created by Bristol (see:
 
 ## Local gwasvcf Files
 
-As mentioned above, the pipeline mainly accepts data in the gwasvcf format. The pipeline is bundled with some wrapped functions which can help with re-formatting your data into this format (see: XXX).
+As mentioned above, the pipeline mainly accepts data in the gwasvcf format. The pipeline is bundled with some wrapper functions which can help with re-formatting your data into this format (see: XXX).
 
 ## OpenGWAS
 
 In place of file names, the pipeline will also accept [OpenGWAS](https://gwas.mrcieu.ac.uk/) IDs, e.g. [ieu-a-7](https://gwas.mrcieu.ac.uk/datasets/ieu-a-7/). OpenGWAS fundamentally stores its data in the gwasvcf format and so expanding functions to accept these IDs meant that a large resource of GWAS data could be integrated into the pipeline for the user's ease of use without having to continually download and convert large files.
 
 For more information, see the [ieugwasr](https://github.com/MRCIEU/ieugwasr) R package.
+
+---
 
 # Data Types
 
@@ -89,9 +91,9 @@ The steps taken by the `read_exposure` function are as follows:
     * If an OpenGWAS ID is used for your exposure data, these are generally pre-clumped on the server and will be reduced quicker than if the clumping needs to take place due to, for example, non-default parameters.
     * Local clumping requires giving the `read_exposure` function a pathway to Plink and Plink reference files.
     * Default parameters for clumping:
-    ** clump_r2 = 0.01
-    ** clump_kb = 10000
-    ** pop = "EUR"
+        + clump_r2 = 0.01
+        + clump_kb = 10000
+        + pop = "EUR"
 
 ```{r exp-help, eval = FALSE}
 ?read_exposure
@@ -166,3 +168,62 @@ head(data.frame(dat))
 
 For all intents and purposes, this function is a wrapper for the `TwoSampleMR::harmonise_data` function (using action = 2 as default). That package has a [good vignette](https://mrcieu.github.io/TwoSampleMR/articles/harmonise.html) describing how the process works, which we recommend reading.
 
+### Pairwise analyses
+
+Harmonising many exposures and outcomes can be slow and labourious. Worse still, if there are many analyses to be conducted then waiting for the harmonisation of all the data can take as long as conducting the actual functional analyses themselves. Therefore, this package has implemented a way of conducting what we are calling "pairwise" analyses by using the following function:
+
+```{r pairwise, eval = FALSE}
+mr_res <- pairwise_analysis(exp_dat, out_dat, "../results")
+```
+
+This function parallelises (default threads: 1) the harmonise and analysis stages of the pipeline by harmonising one exposure and one outcome per thread, and then analysing these (e.g. MR) and writes the results to the disc. This way, results are output constantly as they are generated which makes this function ideal for large-scale analyses. The optional `overwrite` argument (default: `False`) when set to `False` means that analyses will not be re-ran if those results already exist, meaning that if an analysis is interrupted then the script can be set to run again without massive overhead in computed already generated results. For more details, see the help page for this function:
+
+```{r pairwise-help, eval = FALSE}
+?pairwise_analysis
+```
+
+---
+
+# Data cleaning, preparation and saving
+
+## Checking SNPs
+
+`check_snps` is a function which will check the compatibility with either exposure or outcome SNPs for use in MR or colocalisation analyses. By default, these SNPs are dropped but can be retained with a flag marking them for being dropped.
+
+```{r checksnps}
+exp_dat <- check_snps(exp_dat, drop = F)
+
+head(data.frame(exp_dat))
+```
+
+Now if we set a beta to NA:
+
+```{r checksnps2}
+exp_dat[1, "beta.exposure"] <- NA
+exp_dat <- check_snps(exp_dat, drop = F)
+
+head(data.frame(exp_dat))
+```
+
+In particular, this function checks the presence of the following columns and values which are necessary as a minimum:
+
+* `mr`:
+    + P value
+    + Beta
+    + Standard error
+* `coloc`:
+    + P value
+    + Chromosome
+    + Position
+    
+## Saving to gwasvcf format
+
+The package also comes with two functions which simplify the process of saving data in the gwasvcf format, depending on how the data are stored. Both are fundamentally the same; one operates on a data.frame and the other a text file: `dat_to_gwasvcf` and `file_to_gwasvcf` respectively.
+
+These functions require the column names for the requisite data; however, it is also recommended pointing the function to the [bcf tools](https://samtools.github.io/bcftools/) bin, as this will speed up the process. If bcf tools are not provided, then the header of the gwasvcf file will not be written correctly and will be missing some important information, including the total number of variants included and the study type which is required for colocalisation.
+
+By default, these functions will output a zipped file. The gwasvcf files are not required to be unzipped before being used and so we strongly recommend keeping them in this format.
+
+```{r to_gwasvcf, eval = FALSE}
+dat_to_gwasvcf(df, "../data/exposure_data", "chr", "pos", "nea", "ea", snp_col = "snp")
+```

@@ -966,8 +966,8 @@ get_col_name <- function(df, data, type = NA)
 #'
 #' @details List of analyses and what data are checked for:
 #' \itemize{
-#'  \item{"MR"}{beta, SE, P value}
-#'  \item{"coloc"}{chromosome, position, P value}
+#'  \item{"MR"} {beta, SE, P value}
+#'  \item{"coloc"} {chromosome, position, P value}
 #' }
 #'
 #' @return Data.frame
@@ -1003,7 +1003,7 @@ check_snps <- function(dat,
   if ("coloc" %in% analyses)
   {
     dat[is.na(dat[[get_col_name(dat, "chr")]]), "include"] <- F
-    dat[is.na(dat[[get_col_name(dat, "pos")]]), "include"] <- F
+    dat[is.na(dat[[get_col_name(dat, "position")]]), "include"] <- F
   }
 
   if (drop)
