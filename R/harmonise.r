@@ -92,6 +92,7 @@ is_ambiguous <- function(freq, tol = 0.08)
 #' @param do_coloc True/False run colocalisation analyses
 #' @param cores Number of cores for multi-threaded tasks (Optional)
 #'              NB: Unavailable on Windows machines
+#' @param preschedule For mclapply, see \link[parallel]{mclapply}
 #' @param verbose Display verbose information (Optional, boolean)
 #'
 #' @importFrom tidyr crossing
@@ -107,6 +108,7 @@ pairwise_analysis <- function(exposure,
                               all_wr = TRUE,
                               do_coloc = FALSE,
                               cores = 1,
+                              preschedule = FALSE,
                               verbose = TRUE,
                               ...)
 {
@@ -166,5 +168,5 @@ pairwise_analysis <- function(exposure,
       write.table(coloc_res, file = coloc_file_name, ...)
     }
 
-  }, mc.cores = cores)
+  }, mc.cores = cores, mc.preschedule = preschedule)
 }
