@@ -85,10 +85,7 @@ is_ambiguous <- function(freq, tol = 0.08)
 #' @param outcome Data.frame of outcome dataset(s)
 #' @param res_path Path to save result files
 #' @param overwrite If the results file exists, should it be overwritten?
-#' @param ... Other arguments for the following functions:
-#'            \link[mrpipeline]{harmonise}
-#'            \link[mrpipeline]{do_mr}
-#'            \link[mrpipeline]{do_coloc}
+#' @param ... Other arguments for `write.table`
 #' @param do_coloc True/False run colocalisation analyses
 #' @param cores Number of cores for multi-threaded tasks (Optional)
 #'              NB: Unavailable on Windows machines
@@ -106,7 +103,10 @@ pairwise_analysis <- function(exposure,
                               action = 1,
                               f_cutoff = 10,
                               all_wr = TRUE,
+                              # coloc
                               do_coloc = FALSE,
+                              #method = "coloc.abf",
+                              coloc_window = 5e+05,
                               cores = 1,
                               preschedule = FALSE,
                               verbose = TRUE,
@@ -164,7 +164,7 @@ pairwise_analysis <- function(exposure,
 
     if (do_coloc && (!file.exists(coloc_file_name) || overwrite))
     {
-      coloc_res <- do_coloc(dat, ..., cores = cores, verbose = verbose) # TODO remove `...`
+      coloc_res <- do_coloc(dat, method = "coloc.abf", coloc_window = coloc_window, cores = cores, verbose = verbose)
       write.table(coloc_res, file = coloc_file_name, ...)
     }
 
